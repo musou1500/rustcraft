@@ -392,6 +392,11 @@ impl<'window> State<'window> {
                 KeyCode::Digit8 => { self.slot_ui.set_selected_slot(7, &self.queue); return true; },
                 KeyCode::Digit9 => { self.slot_ui.set_selected_slot(8, &self.queue); return true; },
                 KeyCode::Digit0 => { self.slot_ui.set_selected_slot(9, &self.queue); return true; },
+                KeyCode::Delete | KeyCode::Backspace => { 
+                    self.slot_ui.clear_selected_slot(); 
+                    self.slot_ui.update_inventory_buffer(&self.queue);
+                    return true; 
+                },
                 _ => {}
             }
         }

@@ -375,7 +375,7 @@ impl SlotUI {
         }
     }
 
-    fn update_inventory_buffer(&self, queue: &wgpu::Queue) {
+    pub fn update_inventory_buffer(&self, queue: &wgpu::Queue) {
         let mut slot_data_1 = [0u32; 4];
         let mut slot_data_2 = [0u32; 4];
         let mut slot_data_3 = [0u32; 4];
