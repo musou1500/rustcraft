@@ -369,6 +369,9 @@ impl SlotUI {
             BlockType::Iron => TextureId::Iron as u32,
             BlockType::Gold => TextureId::Gold as u32,
             BlockType::Snow => TextureId::Snow as u32,
+            BlockType::Planks => TextureId::Planks as u32,
+            BlockType::Cobblestone => TextureId::Cobblestone as u32,
+            BlockType::Glass => TextureId::Glass as u32,
         }
     }
 

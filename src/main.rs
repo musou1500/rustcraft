@@ -18,6 +18,7 @@ mod texture_atlas;
 mod raycast;
 mod wireframe;
 mod slot_ui;
+mod structures;
 
 use camera::CameraSystem;
 use terrain::Terrain;

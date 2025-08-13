@@ -16,6 +16,9 @@ pub enum BlockType {
     Iron,
     Gold,
     Snow,
+    Planks,
+    Cobblestone,
+    Glass,
 }
 
 /// Texture atlas indices for different block textures
@@ -35,6 +38,9 @@ pub enum TextureId {
     Gold = 11,
     Snow = 12,
     Bedrock = 13,
+    Planks = 14,
+    Cobblestone = 15,
+    Glass = 16,
 }
 
 /// Material properties for a block type
@@ -223,6 +229,36 @@ impl BlockRegistry {
             hardness: 0.2,
             is_solid: true,
             is_transparent: false,
+            emission: 0.0,
+        });
+        
+        // Planks - wooden planks for construction
+        self.register(BlockType::Planks, BlockMaterial {
+            name: "Planks",
+            textures: FaceTextures::all_same(TextureId::Planks as u32),
+            hardness: 2.0,
+            is_solid: true,
+            is_transparent: false,
+            emission: 0.0,
+        });
+        
+        // Cobblestone - stone blocks for construction
+        self.register(BlockType::Cobblestone, BlockMaterial {
+            name: "Cobblestone",
+            textures: FaceTextures::all_same(TextureId::Cobblestone as u32),
+            hardness: 3.5,
+            is_solid: true,
+            is_transparent: false,
+            emission: 0.0,
+        });
+        
+        // Glass - transparent windows
+        self.register(BlockType::Glass, BlockMaterial {
+            name: "Glass",
+            textures: FaceTextures::all_same(TextureId::Glass as u32),
+            hardness: 0.5,
+            is_solid: true,
+            is_transparent: true,
             emission: 0.0,
         });
     }
