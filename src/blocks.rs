@@ -325,19 +325,17 @@ pub mod generation {
     }
 }
 
+use std::sync::OnceLock;
+
 /// Global block registry instance
-static mut BLOCK_REGISTRY: Option<BlockRegistry> = None;
+static BLOCK_REGISTRY: OnceLock<BlockRegistry> = OnceLock::new();
 
 /// Initialize the global block registry
 pub fn init_block_registry() {
-    unsafe {
-        BLOCK_REGISTRY = Some(BlockRegistry::new());
-    }
+    BLOCK_REGISTRY.get_or_init(BlockRegistry::new);
 }
 
 /// Get reference to the global block registry
 pub fn get_block_registry() -> &'static BlockRegistry {
-    unsafe {
-        BLOCK_REGISTRY.as_ref().expect("Block registry not initialized")
-    }
+    BLOCK_REGISTRY.get().expect("Block registry not initialized")
 }

@@ -1,4 +1,3 @@
-use wgpu::util::DeviceExt;
 
 pub struct TextureAtlas {
     pub texture: wgpu::Texture,

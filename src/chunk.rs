@@ -1,4 +1,4 @@
-use crate::blocks::{generation, get_block_registry, BlockType};
+use crate::blocks::{get_block_registry, BlockType};
 use crate::structures::{PlacedStructure, StructureGenerator};
 use crate::terrain::Terrain;
 use crate::voxel::{create_cube_indices_selective, create_cube_vertices_selective, Vertex};
@@ -7,7 +7,6 @@ use rayon::prelude::*;
 pub const CHUNK_SIZE: usize = 16;
 pub const WORLD_HEIGHT: usize = 64; // Maximum world height for building
 pub const TERRAIN_MAX_HEIGHT: usize = 24; // Maximum natural terrain height
-const BASE_HEIGHT: usize = 8; // Minimum terrain height
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkPos {
@@ -88,7 +87,7 @@ impl ChunkGenerator {
         let registry = get_block_registry();
 
         // Pre-generate block data for the entire chunk to enable face culling
-        let mut chunk_blocks = [[[BlockType::Air; WORLD_HEIGHT]; CHUNK_SIZE]; CHUNK_SIZE];
+        let mut chunk_blocks;
 
         // Pre-compute noise values for the entire chunk in batches
         let mut height_values = vec![vec![0usize; CHUNK_SIZE]; CHUNK_SIZE];

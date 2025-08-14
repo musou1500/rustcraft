@@ -115,7 +115,7 @@ impl ChunkDebugRenderer {
         }
     }
     
-    pub fn update_chunks(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, chunk_positions: &[ChunkPos]) {
+    pub fn update_chunks(&mut self, device: &wgpu::Device, chunk_positions: &[ChunkPos]) {
         // Only update if chunks have changed
         if self.current_chunks.len() == chunk_positions.len() && 
            self.current_chunks.iter().all(|pos| chunk_positions.contains(pos)) {
@@ -176,10 +176,10 @@ impl ChunkDebugRenderer {
             
             // Bottom face edges
             indices.extend(&[
-                start_vertex + 0, start_vertex + 1,  // Bottom front edge
+                start_vertex, start_vertex + 1,  // Bottom front edge
                 start_vertex + 1, start_vertex + 2,  // Bottom right edge
                 start_vertex + 2, start_vertex + 3,  // Bottom back edge
-                start_vertex + 3, start_vertex + 0,  // Bottom left edge
+                start_vertex + 3, start_vertex,  // Bottom left edge
             ]);
             
             // Top face edges
@@ -192,7 +192,7 @@ impl ChunkDebugRenderer {
             
             // Vertical edges
             indices.extend(&[
-                start_vertex + 0, start_vertex + 4,  // Front left vertical
+                start_vertex, start_vertex + 4,  // Front left vertical
                 start_vertex + 1, start_vertex + 5,  // Front right vertical
                 start_vertex + 2, start_vertex + 6,  // Back right vertical
                 start_vertex + 3, start_vertex + 7,  // Back left vertical

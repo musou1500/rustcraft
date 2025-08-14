@@ -1,7 +1,7 @@
 use crate::blocks::BlockType;
 use crate::chunk::{Chunk, ChunkData, ChunkGenerator, ChunkPos, ChunkBlocks, CHUNK_SIZE, WORLD_HEIGHT};
 use crate::terrain::Terrain;
-use crate::voxel::{create_cube_indices_selective, create_cube_vertices_selective, Vertex};
+use crate::voxel::{create_cube_indices_selective, create_cube_vertices_selective};
 use cgmath::Point3;
 use std::collections::HashMap;
 
@@ -41,7 +41,7 @@ pub struct World {
 }
 
 impl World {
-    pub fn new(device: &wgpu::Device) -> Self {
+    pub fn new() -> Self {
         let terrain = Terrain::new(42);
         let chunk_generator = ChunkGenerator::new(7777);
         let chunks = HashMap::new();

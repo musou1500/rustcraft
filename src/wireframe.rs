@@ -114,7 +114,7 @@ impl WireframeRenderer {
         }
     }
     
-    pub fn update_position(&self, device: &wgpu::Device, queue: &wgpu::Queue, x: f32, y: f32, z: f32) {
+    pub fn update_position(&self, queue: &wgpu::Queue, x: f32, y: f32, z: f32) {
         let vertices = create_wireframe_cube_vertices(x, y, z);
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
     }

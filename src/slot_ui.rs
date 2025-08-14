@@ -337,7 +337,6 @@ impl SlotUI {
 
     pub fn update_geometry(
         &self,
-        _device: &wgpu::Device,
         queue: &wgpu::Queue,
         window_width: u32,
         window_height: u32,

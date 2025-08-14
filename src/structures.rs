@@ -238,7 +238,7 @@ impl Structure for TreeStructure {
     }
     
     fn can_place_at_height(&self, height: i32) -> bool {
-        height >= 5 && height < 20  // Trees need some ground and shouldn't be too high
+        (5..20).contains(&height)  // Trees need some ground and shouldn't be too high
     }
 }
 
@@ -303,8 +303,7 @@ impl Structure for HouseStructure {
                                 
                                 // Windows on sides
                                 let is_window = y == 2 && (
-                                    (x == 0 && z == depth / 2) ||  // Left window
-                                    (x == width - 1 && z == depth / 2) ||  // Right window
+                                    (x == width - 1 || x == 0) && z == depth / 2 ||  // Left/Right windows
                                     (z == depth - 1 && x == width / 2)  // Back window
                                 );
                                 
@@ -382,8 +381,7 @@ impl Structure for HouseStructure {
                                 
                                 // More windows for medium house
                                 let is_window = y == 2 && (
-                                    (x == 0 && (z == 2 || z == depth - 3)) ||  // Left windows
-                                    (x == width - 1 && (z == 2 || z == depth - 3)) ||  // Right windows
+                                    (x == width - 1 || x == 0) && (z == depth - 3 || z == 2) ||  // Left/Right windows
                                     (z == depth - 1 && (x == 2 || x == width - 3))  // Back windows
                                 ) || (y == 3 && z == 0 && (x == 1 || x == width - 2));  // Front upper windows
                                 
@@ -452,7 +450,7 @@ impl Structure for HouseStructure {
     }
     
     fn can_place_at_height(&self, height: i32) -> bool {
-        height >= 8 && height < 18  // Houses need flat ground, not too high
+        (8..18).contains(&height)  // Houses need flat ground, not too high
     }
 }
 

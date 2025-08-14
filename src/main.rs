@@ -41,13 +41,13 @@ struct State<'window> {
     light: DirectionalLight,
     render_pipeline: wgpu::RenderPipeline,
     shadow_pipeline: wgpu::RenderPipeline,
-    shadow_texture: wgpu::Texture,
+    _shadow_texture: wgpu::Texture,
     shadow_view: wgpu::TextureView,
-    shadow_sampler: wgpu::Sampler,
+    _shadow_sampler: wgpu::Sampler,
     shadow_bind_group: wgpu::BindGroup,
-    shadow_bind_group_layout: wgpu::BindGroupLayout,
+    _shadow_bind_group_layout: wgpu::BindGroupLayout,
     texture_atlas: TextureAtlas,
-    texture_bind_group_layout: wgpu::BindGroupLayout,
+    _texture_bind_group_layout: wgpu::BindGroupLayout,
     wireframe_renderer: WireframeRenderer,
     chunk_debug_renderer: ChunkDebugRenderer,
     progress_ui: ProgressUI,
@@ -122,7 +122,7 @@ impl<'window> State<'window> {
             &device,
         );
 
-        let world = World::new(&device);
+        let world = World::new();
         let light = DirectionalLight::new(&device);
 
         // Create shadow map texture
@@ -355,13 +355,13 @@ impl<'window> State<'window> {
             light,
             render_pipeline,
             shadow_pipeline,
-            shadow_texture,
+            _shadow_texture: shadow_texture,
             shadow_view,
-            shadow_sampler,
+            _shadow_sampler: shadow_sampler,
             shadow_bind_group,
-            shadow_bind_group_layout,
+            _shadow_bind_group_layout: shadow_bind_group_layout,
             texture_atlas,
-            texture_bind_group_layout,
+            _texture_bind_group_layout: texture_bind_group_layout,
             wireframe_renderer,
             chunk_debug_renderer,
             progress_ui,
@@ -385,7 +385,6 @@ impl<'window> State<'window> {
 
             // Update slot UI geometry for new window size (fixed 100px slots)
             self.slot_ui.update_geometry(
-                &self.device,
                 &self.queue,
                 new_size.width,
                 new_size.height,
@@ -516,7 +515,7 @@ impl<'window> State<'window> {
         if self.debug_mode {
             let chunk_positions = self.world.get_loaded_chunk_positions();
             self.chunk_debug_renderer
-                .update_chunks(&self.device, &self.queue, &chunk_positions);
+                .update_chunks(&self.device, &chunk_positions);
         }
 
         // Update block selection (only when cursor is locked and window focused)
@@ -715,7 +714,7 @@ impl<'window> State<'window> {
             self.last_progress_indices = 6 + progress_fill_indices + 210; // Approximate for loading text
 
             self.progress_ui
-                .update_progress(&self.device, &self.queue, progress, is_generating);
+                .update_progress(&self.queue, progress, is_generating);
 
             // Update window title
             if progress >= 1.0 {
@@ -851,7 +850,6 @@ impl<'window> State<'window> {
                     }
 
                     self.wireframe_renderer.update_position(
-                        &self.device,
                         &self.queue,
                         hit.block_pos[0] as f32,
                         hit.block_pos[1] as f32,

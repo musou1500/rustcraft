@@ -1,4 +1,3 @@
-use wgpu::util::DeviceExt;
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
@@ -105,7 +104,7 @@ impl ProgressUI {
         }
     }
 
-    pub fn update_progress(&self, device: &wgpu::Device, queue: &wgpu::Queue, progress: f32, is_generating: bool) {
+    pub fn update_progress(&self, queue: &wgpu::Queue, progress: f32, is_generating: bool) {
         if !is_generating {
             return;
         }
