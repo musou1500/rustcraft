@@ -1,6 +1,6 @@
 use wgpu::util::DeviceExt;
 use bytemuck::{Pod, Zeroable};
-use crate::terrain::{ChunkPos, CHUNK_SIZE, WORLD_HEIGHT};
+use crate::chunk::{ChunkPos, CHUNK_SIZE, WORLD_HEIGHT};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]

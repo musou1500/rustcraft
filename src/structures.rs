@@ -1,4 +1,5 @@
 use crate::blocks::BlockType;
+use crate::chunk::CHUNK_SIZE;
 use noise::{NoiseFn, Perlin};
 use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
@@ -500,32 +501,54 @@ impl StructureGenerator {
         }
     }
     
-    /// Generate structures for a chunk
+    /// Generate structures for a chunk, including structures from neighboring chunks that extend into this chunk
     pub fn generate_structures_for_chunk(
         &self,
         chunk_x: i32,
         chunk_z: i32,
-        terrain_height_map: &[[usize; 16]; 16],
-        biome_map: &[[f64; 16]; 16],
+        terrain_height_map: &[[usize; CHUNK_SIZE]; CHUNK_SIZE],
+        biome_map: &[[f64; CHUNK_SIZE]; CHUNK_SIZE],
+        terrain: &crate::terrain::Terrain,
     ) -> Vec<PlacedStructure> {
         let mut structures = Vec::new();
-        let chunk_size = 16i32;
         
-        // Check a grid of positions for potential structure placement
-        // Use spacing to avoid overlapping structures
+        // Maximum structure bounds analysis shows largest structures are 7x7
+        // So we need to check positions up to 4 blocks outside chunk boundaries
+        let search_radius = 4;
         let spacing = 8;
         
-        for local_x in (0..chunk_size).step_by(spacing) {
-            for local_z in (0..chunk_size).step_by(spacing) {
-                let world_x = chunk_x * chunk_size + local_x;
-                let world_z = chunk_z * chunk_size + local_z;
+        // Calculate the range of world coordinates we need to check
+        let chunk_start_x = chunk_x * CHUNK_SIZE as i32;
+        let chunk_start_z = chunk_z * CHUNK_SIZE as i32;
+        let search_start_x = chunk_start_x - search_radius;
+        let search_end_x = chunk_start_x + CHUNK_SIZE as i32 + search_radius;
+        let search_start_z = chunk_start_z - search_radius;
+        let search_end_z = chunk_start_z + CHUNK_SIZE as i32 + search_radius;
+        
+        // Check positions in expanded search area
+        for world_x in (search_start_x..search_end_x).step_by(spacing) {
+            for world_z in (search_start_z..search_end_z).step_by(spacing) {
                 
                 if !self.should_place_structure(world_x, world_z) {
                     continue;
                 }
                 
-                let terrain_height = terrain_height_map[local_x as usize][local_z as usize];
-                let biome_value = biome_map[local_x as usize][local_z as usize];
+                // Calculate local coordinates relative to the current chunk
+                let local_x = world_x - chunk_start_x;
+                let local_z = world_z - chunk_start_z;
+                
+                // For positions outside the chunk, we need to calculate height and biome using noise
+                let (terrain_height, biome_value) = if local_x >= 0 && local_x < CHUNK_SIZE as i32 && 
+                                                       local_z >= 0 && local_z < CHUNK_SIZE as i32 {
+                    // Position is within current chunk - use provided height map
+                    (terrain_height_map[local_x as usize][local_z as usize], 
+                     biome_map[local_x as usize][local_z as usize])
+                } else {
+                    // Position is outside current chunk - query terrain for values
+                    let height = terrain.calculate_height_at(world_x, world_z);
+                    let biome = terrain.calculate_biome_at(world_x, world_z);
+                    (height, biome)
+                };
                 
                 // Create deterministic RNG for this position
                 let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -557,15 +580,21 @@ impl StructureGenerator {
                     let (width, _, depth) = structure.get_bounds();
                     let mut height_variance = 0i32;
                     
-                    for dx in 0..width.min(chunk_size - local_x) {
-                        for dz in 0..depth.min(chunk_size - local_z) {
-                            let check_x = (local_x + dx) as usize;
-                            let check_z = (local_z + dz) as usize;
+                    for dx in 0..width {
+                        for dz in 0..depth {
+                            let check_world_x = world_x + dx;
+                            let check_world_z = world_z + dz;
+                            let check_local_x = check_world_x - chunk_start_x;
+                            let check_local_z = check_world_z - chunk_start_z;
                             
-                            if check_x < 16 && check_z < 16 {
-                                let h = terrain_height_map[check_x][check_z] as i32;
-                                height_variance = height_variance.max((h - terrain_height as i32).abs());
-                            }
+                            let check_height = if check_local_x >= 0 && check_local_x < CHUNK_SIZE as i32 &&
+                                                  check_local_z >= 0 && check_local_z < CHUNK_SIZE as i32 {
+                                terrain_height_map[check_local_x as usize][check_local_z as usize] as i32
+                            } else {
+                                terrain.calculate_height_at(check_world_x, check_world_z) as i32
+                            };
+                            
+                            height_variance = height_variance.max((check_height - terrain_height as i32).abs());
                         }
                     }
                     

@@ -1,5 +1,5 @@
 use cgmath::*;
-use crate::terrain::Terrain;
+use crate::world::World;
 
 /// Represents a 3D ray for raycasting
 #[derive(Debug)]
@@ -32,7 +32,7 @@ pub struct RaycastHit {
 }
 
 /// Perform DDA (Digital Differential Analyzer) raycasting to find block intersections
-pub fn raycast_blocks(ray: Ray, max_distance: f32, terrain: &Terrain) -> Option<RaycastHit> {
+pub fn raycast_blocks(ray: Ray, max_distance: f32, world: &World) -> Option<RaycastHit> {
     let max_steps = (max_distance * 2.0) as i32; // Reasonable step limit
     
     // Current position in the grid
@@ -80,7 +80,7 @@ pub fn raycast_blocks(ray: Ray, max_distance: f32, terrain: &Terrain) -> Option<
     // DDA algorithm
     for _ in 0..max_steps {
         // Check if current block is solid (not air)
-        if terrain.is_block_solid(current_block[0], current_block[1], current_block[2]) {
+        if world.is_block_solid(current_block[0], current_block[1], current_block[2]) {
             // Calculate hit distance
             let distance = match last_side {
                 0 => (current_block[0] as f32 - ray.origin.x + if step[0] > 0 { 0.0 } else { 1.0 }) / ray.direction.x,

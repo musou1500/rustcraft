@@ -7,6 +7,7 @@ use winit::{
 
 mod blocks;
 mod camera;
+mod chunk;
 mod chunk_debug;
 mod light;
 mod progress_ui;
@@ -17,6 +18,7 @@ mod terrain;
 mod texture_atlas;
 mod voxel;
 mod wireframe;
+mod world;
 
 use camera::CameraSystem;
 use chunk_debug::ChunkDebugRenderer;
@@ -24,9 +26,9 @@ use light::DirectionalLight;
 use progress_ui::ProgressUI;
 use raycast::{create_camera_ray, raycast_blocks, RaycastHit};
 use slot_ui::SlotUI;
-use terrain::Terrain;
 use texture_atlas::TextureAtlas;
 use wireframe::WireframeRenderer;
+use world::World;
 
 struct State<'window> {
     surface: wgpu::Surface<'window>,
@@ -35,7 +37,7 @@ struct State<'window> {
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
     camera: CameraSystem,
-    terrain: Terrain,
+    world: World,
     light: DirectionalLight,
     render_pipeline: wgpu::RenderPipeline,
     shadow_pipeline: wgpu::RenderPipeline,
@@ -120,7 +122,7 @@ impl<'window> State<'window> {
             &device,
         );
 
-        let terrain = Terrain::new(&device);
+        let world = World::new(&device);
         let light = DirectionalLight::new(&device);
 
         // Create shadow map texture
@@ -349,7 +351,7 @@ impl<'window> State<'window> {
             config,
             size,
             camera,
-            terrain,
+            world,
             light,
             render_pipeline,
             shadow_pipeline,
@@ -503,16 +505,16 @@ impl<'window> State<'window> {
     }
 
     fn update(&mut self, dt: std::time::Duration) {
-        self.camera.update(dt, &self.terrain);
+        self.camera.update(dt, &self.world);
         self.camera.update_buffer(&self.queue);
         self.light.update_buffer(&self.queue);
 
         let camera_pos = self.camera.get_position();
-        self.terrain.update(camera_pos, &self.device);
+        self.world.update(camera_pos, &self.device);
 
         // Update chunk debug renderer if debug mode is enabled
         if self.debug_mode {
-            let chunk_positions = self.terrain.get_loaded_chunk_positions();
+            let chunk_positions = self.world.get_loaded_chunk_positions();
             self.chunk_debug_renderer
                 .update_chunks(&self.device, &self.queue, &chunk_positions);
         }
@@ -539,13 +541,13 @@ impl<'window> State<'window> {
         let camera_pitch = self.camera.get_pitch();
 
         let ray = create_camera_ray(camera_pos, camera_yaw, camera_pitch);
-        let new_selection = raycast_blocks(ray, 5.0, &self.terrain); // 5 block reach distance
+        let new_selection = raycast_blocks(ray, 5.0, &self.world); // 5 block reach distance
 
         // Debug: Print when selection changes
         match (&self.selected_block, &new_selection) {
             (None, Some(hit)) => {
                 // Verify this is actually a solid block
-                let is_solid = self.terrain.is_block_solid(
+                let is_solid = self.world.is_block_solid(
                     hit.block_pos[0],
                     hit.block_pos[1],
                     hit.block_pos[2],
@@ -562,7 +564,7 @@ impl<'window> State<'window> {
                 println!("Block deselected");
             }
             (Some(old), Some(new)) if old.block_pos != new.block_pos => {
-                let is_solid = self.terrain.is_block_solid(
+                let is_solid = self.world.is_block_solid(
                     new.block_pos[0],
                     new.block_pos[1],
                     new.block_pos[2],
@@ -592,7 +594,7 @@ impl<'window> State<'window> {
                 println!("Breaking block at: {:?}", hit.block_pos);
 
                 // Actually remove the block from terrain
-                let removed_block_type = self.terrain.remove_block(
+                let removed_block_type = self.world.remove_block(
                     hit.block_pos[0],
                     hit.block_pos[1],
                     hit.block_pos[2],
@@ -633,7 +635,7 @@ impl<'window> State<'window> {
         }
 
         // Add block to terrain
-        let success = self.terrain.add_block(
+        let success = self.world.add_block(
             placement_pos[0],
             placement_pos[1],
             placement_pos[2],
@@ -654,7 +656,7 @@ impl<'window> State<'window> {
 
     fn is_valid_placement_position(&self, pos: [i32; 3]) -> bool {
         // Check if position is within world bounds
-        if pos[1] < 0 || pos[1] >= terrain::WORLD_HEIGHT as i32 {
+        if pos[1] < 0 || pos[1] >= chunk::WORLD_HEIGHT as i32 {
             return false;
         }
 
@@ -684,7 +686,7 @@ impl<'window> State<'window> {
         if let Some(hit) = self.selected_block {
             // Get the block type at the selected position
             if let Some(block_type) =
-                self.terrain
+                self.world
                     .get_block_type(hit.block_pos[0], hit.block_pos[1], hit.block_pos[2])
             {
                 // Don't put air blocks in slots
@@ -703,8 +705,8 @@ impl<'window> State<'window> {
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         // Update progress UI
-        let progress = self.terrain.progress.get_progress();
-        let is_generating = self.terrain.progress.is_generating;
+        let progress = self.world.progress.get_progress();
+        let is_generating = self.world.progress.is_generating;
 
         // Calculate number of indices for rendering
         if is_generating {
@@ -778,7 +780,7 @@ impl<'window> State<'window> {
 
             shadow_pass.set_pipeline(&self.shadow_pipeline);
             shadow_pass.set_bind_group(0, &self.light.bind_group, &[]);
-            self.terrain.render(&mut shadow_pass);
+            self.world.render(&mut shadow_pass);
         }
 
         // Main render pass
@@ -789,7 +791,7 @@ impl<'window> State<'window> {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(if self.terrain.progress.is_generating {
+                        load: wgpu::LoadOp::Clear(if self.world.progress.is_generating {
                             // Darker background during generation
                             wgpu::Color {
                                 r: 0.2,
@@ -821,7 +823,7 @@ impl<'window> State<'window> {
                 timestamp_writes: None,
             });
 
-            if self.terrain.progress.is_generating {
+            if self.world.progress.is_generating {
                 // Render progress UI during generation
                 self.progress_ui.render(
                     &mut render_pass,
@@ -835,7 +837,7 @@ impl<'window> State<'window> {
                 render_pass.set_bind_group(1, &self.light.bind_group, &[]);
                 render_pass.set_bind_group(2, &self.shadow_bind_group, &[]);
                 render_pass.set_bind_group(3, &self.texture_atlas.bind_group, &[]);
-                self.terrain.render(&mut render_pass);
+                self.world.render(&mut render_pass);
 
                 // Render block selection wireframe
                 if let Some(hit) = self.selected_block {

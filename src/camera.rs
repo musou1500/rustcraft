@@ -191,7 +191,7 @@ impl CameraController {
         &mut self,
         camera: &mut Camera,
         dt: Duration,
-        terrain: &crate::terrain::Terrain,
+        world: &crate::world::World,
     ) {
         let dt = dt.as_secs_f32();
 
@@ -242,7 +242,7 @@ impl CameraController {
         // Check X movement collision
         if !self.check_collision(
             Point3::new(new_x, camera.position.y, camera.position.z),
-            terrain,
+            world,
         ) {
             camera.position.x = new_x;
         }
@@ -250,7 +250,7 @@ impl CameraController {
         // Check Z movement collision
         if !self.check_collision(
             Point3::new(camera.position.x, camera.position.y, new_z),
-            terrain,
+            world,
         ) {
             camera.position.z = new_z;
         }
@@ -271,14 +271,14 @@ impl CameraController {
         // Check if player would be underground or hit ceiling
         let collision_pos = Point3::new(camera.position.x, new_y, camera.position.z);
 
-        if self.check_collision(collision_pos, terrain) {
+        if self.check_collision(collision_pos, world) {
             if self.velocity_y < 0.0 {
                 // Hit ground
                 self.velocity_y = 0.0;
                 self.is_grounded = true;
                 // Snap to ground level
                 camera.position.y =
-                    self.find_ground_level(camera.position.x, camera.position.z, terrain);
+                    self.find_ground_level(camera.position.x, camera.position.z, world);
             } else {
                 // Hit ceiling
                 self.velocity_y = 0.0;
@@ -292,7 +292,7 @@ impl CameraController {
     fn check_collision(
         &self,
         eye_position: Point3<f32>,
-        terrain: &crate::terrain::Terrain,
+        world: &crate::world::World,
     ) -> bool {
         // Convert eye position to feet position
         let feet_position = Point3::new(
@@ -310,20 +310,20 @@ impl CameraController {
 
         // Check blocks at player position for both feet and head levels
         for y in feet_y..=head_y {
-            if terrain.is_block_solid(player_x, y, player_z) {
+            if world.is_block_solid(player_x, y, player_z) {
                 return true;
             }
         }
         false
     }
 
-    fn find_ground_level(&self, x: f32, z: f32, terrain: &crate::terrain::Terrain) -> f32 {
+    fn find_ground_level(&self, x: f32, z: f32, world: &crate::world::World) -> f32 {
         let block_x = x.floor() as i32;
         let block_z = z.floor() as i32;
 
         // Search downward for the highest solid block
-        for y in (0..crate::terrain::WORLD_HEIGHT as i32).rev() {
-            if terrain.is_block_solid(block_x, y, block_z) {
+        for y in (0..crate::chunk::WORLD_HEIGHT as i32).rev() {
+            if world.is_block_solid(block_x, y, block_z) {
                 // Return eye level position (feet position + eye height)
                 return (y + 1) as f32 + self.eye_height;
             }
@@ -413,8 +413,8 @@ impl CameraSystem {
         self.controller.process_device_events(event)
     }
 
-    pub fn update(&mut self, dt: Duration, terrain: &crate::terrain::Terrain) {
-        self.controller.update_camera(&mut self.camera, dt, terrain);
+    pub fn update(&mut self, dt: Duration, world: &crate::world::World) {
+        self.controller.update_camera(&mut self.camera, dt, world);
         self.uniform.update_view_proj(&self.camera);
     }
 
