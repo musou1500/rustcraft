@@ -9,35 +9,11 @@ use std::collections::HashMap;
 
 const RENDER_DISTANCE: i32 = 4;
 
-pub struct TerrainProgress {
-    pub total_chunks: usize,
-    pub completed_chunks: usize,
-    pub is_generating: bool,
-}
-
-impl TerrainProgress {
-    pub fn new() -> Self {
-        Self {
-            total_chunks: 0,
-            completed_chunks: 0,
-            is_generating: false,
-        }
-    }
-
-    pub fn get_progress(&self) -> f32 {
-        if self.total_chunks == 0 {
-            0.0
-        } else {
-            self.completed_chunks as f32 / self.total_chunks as f32
-        }
-    }
-}
 
 pub struct World {
     chunks: HashMap<ChunkPos, Chunk>,
     terrain: Terrain,
     chunk_generator: ChunkGenerator,
-    pub progress: TerrainProgress,
     // Cache the actual block data for each chunk - this is the single source of truth
     chunk_blocks: HashMap<ChunkPos, ChunkBlocks>,
 }
@@ -52,7 +28,6 @@ impl World {
             chunks,
             terrain,
             chunk_generator,
-            progress: TerrainProgress::new(),
             chunk_blocks: HashMap::new(),
         }
     }
@@ -78,9 +53,6 @@ impl World {
 
         // Generate chunk data in parallel
         if !chunks_to_generate.is_empty() {
-            self.progress.is_generating = true;
-            self.progress.total_chunks = chunks_to_generate.len();
-            self.progress.completed_chunks = 0;
 
             // Generate chunks in parallel
             use rayon::prelude::*;
@@ -99,10 +71,8 @@ impl World {
                 let chunk = Chunk::from_data(chunk_data, device);
                 self.chunks.insert(chunk_pos, chunk);
                 self.chunk_blocks.insert(chunk_pos, block_array);
-                self.progress.completed_chunks += 1;
             }
 
-            self.progress.is_generating = false;
         }
 
         // Remove distant chunks

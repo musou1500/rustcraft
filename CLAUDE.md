@@ -51,7 +51,6 @@ Shaders are located in src/ as .wgsl files:
 - `shader.wgsl`: Main vertex/fragment shaders for world rendering
 - `shadow.wgsl`: Shadow mapping shaders
 - `wireframe.wgsl`: Block selection wireframe rendering
-- `progress_ui.wgsl`: Loading screen UI
 - `slot_ui.wgsl`: Inventory slot rendering
 
 ### Key Systems
@@ -113,5 +112,5 @@ Shaders are located in src/ as .wgsl files:
 ### Common Modifications
 - Adjust `RENDER_DISTANCE` in terrain.rs to change view distance
 - Modify noise parameters in `generate_chunk_data()` for different terrain
-- Add new UI elements by following the pattern in slot_ui.rs/progress_ui.rs
+- Add new UI elements by following the pattern in slot_ui.rs
 - Extend the block registry for new materials and textures

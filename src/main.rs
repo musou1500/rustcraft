@@ -10,7 +10,6 @@ mod camera;
 mod chunk;
 mod chunk_debug;
 mod light;
-mod progress_ui;
 mod raycast;
 mod slot_ui;
 mod structures;
@@ -23,7 +22,6 @@ mod world;
 use camera::CameraSystem;
 use chunk_debug::ChunkDebugRenderer;
 use light::DirectionalLight;
-use progress_ui::ProgressUI;
 use raycast::{create_camera_ray, raycast_blocks, RaycastHit};
 use slot_ui::SlotUI;
 use texture_atlas::TextureAtlas;
@@ -50,11 +48,8 @@ struct State<'window> {
     _texture_bind_group_layout: wgpu::BindGroupLayout,
     wireframe_renderer: WireframeRenderer,
     chunk_debug_renderer: ChunkDebugRenderer,
-    progress_ui: ProgressUI,
     slot_ui: SlotUI,
     window: &'window Window,
-    last_progress_output: f32,
-    last_progress_indices: u32,
     cursor_locked: bool,
     window_focused: bool,
     selected_block: Option<RaycastHit>,
@@ -294,7 +289,6 @@ impl<'window> State<'window> {
             WireframeRenderer::new(&device, surface_format, &camera.bind_group_layout);
         let chunk_debug_renderer =
             ChunkDebugRenderer::new(&device, surface_format, &camera.bind_group_layout);
-        let progress_ui = ProgressUI::new(&device, surface_format);
         let slot_ui = SlotUI::new(
             &device,
             surface_format,
@@ -364,11 +358,8 @@ impl<'window> State<'window> {
             _texture_bind_group_layout: texture_bind_group_layout,
             wireframe_renderer,
             chunk_debug_renderer,
-            progress_ui,
             slot_ui,
             window,
-            last_progress_output: -1.0,
-            last_progress_indices: 0,
             cursor_locked: true,
             window_focused: true,
             selected_block: None,
@@ -696,35 +687,6 @@ impl<'window> State<'window> {
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        // Update progress UI
-        let progress = self.world.progress.get_progress();
-        let is_generating = self.world.progress.is_generating;
-
-        // Calculate number of indices for rendering
-        if is_generating {
-            // Background bar (6 indices) + progress fill (6 indices if progress > 0) + loading text (~200 indices)
-            let progress_fill_indices = if progress > 0.0 { 6 } else { 0 };
-            self.last_progress_indices = 6 + progress_fill_indices + 210; // Approximate for loading text
-
-            self.progress_ui
-                .update_progress(&self.queue, progress, is_generating);
-
-            // Update window title
-            if progress >= 1.0 {
-                self.window.set_title("Voxel Game - Ready!");
-            } else {
-                self.window.set_title(&format!(
-                    "Voxel Game - Generating Terrain {:.0}%",
-                    progress * 100.0
-                ));
-            }
-        } else {
-            self.last_progress_indices = 0;
-            if self.last_progress_output != -1.0 {
-                self.window.set_title("Voxel Game");
-                self.last_progress_output = -1.0;
-            }
-        }
 
         let output = self.surface.get_current_texture()?;
         let view = output
@@ -783,22 +745,11 @@ impl<'window> State<'window> {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(if self.world.progress.is_generating {
-                            // Darker background during generation
-                            wgpu::Color {
-                                r: 0.2,
-                                g: 0.3,
-                                b: 0.4,
-                                a: 1.0,
-                            }
-                        } else {
-                            // Normal sky color
-                            wgpu::Color {
-                                r: 0.5,
-                                g: 0.8,
-                                b: 1.0,
-                                a: 1.0,
-                            }
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.5,
+                            g: 0.8,
+                            b: 1.0,
+                            a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
                     },
@@ -815,52 +766,43 @@ impl<'window> State<'window> {
                 timestamp_writes: None,
             });
 
-            if self.world.progress.is_generating {
-                // Render progress UI during generation
-                self.progress_ui.render(
-                    &mut render_pass,
-                    is_generating,
-                    self.last_progress_indices,
-                );
-            } else {
-                // Render normal terrain
-                render_pass.set_pipeline(&self.render_pipeline);
-                render_pass.set_bind_group(0, &self.camera.bind_group, &[]);
-                render_pass.set_bind_group(1, &self.light.bind_group, &[]);
-                render_pass.set_bind_group(2, &self.shadow_bind_group, &[]);
-                render_pass.set_bind_group(3, &self.texture_atlas.bind_group, &[]);
-                self.world.render(&mut render_pass);
+            // Render normal terrain
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.camera.bind_group, &[]);
+            render_pass.set_bind_group(1, &self.light.bind_group, &[]);
+            render_pass.set_bind_group(2, &self.shadow_bind_group, &[]);
+            render_pass.set_bind_group(3, &self.texture_atlas.bind_group, &[]);
+            self.world.render(&mut render_pass);
 
-                // Render block selection wireframe
-                if let Some(hit) = self.selected_block {
-                    // Debug: Print when wireframe is being rendered
-                    static mut LAST_WIREFRAME_POS: Option<[i32; 3]> = None;
-                    unsafe {
-                        if LAST_WIREFRAME_POS != Some(hit.block_pos) {
-                            println!("Rendering wireframe at: {:?}", hit.block_pos);
-                            LAST_WIREFRAME_POS = Some(hit.block_pos);
-                        }
+            // Render block selection wireframe
+            if let Some(hit) = self.selected_block {
+                // Debug: Print when wireframe is being rendered
+                static mut LAST_WIREFRAME_POS: Option<[i32; 3]> = None;
+                unsafe {
+                    if LAST_WIREFRAME_POS != Some(hit.block_pos) {
+                        println!("Rendering wireframe at: {:?}", hit.block_pos);
+                        LAST_WIREFRAME_POS = Some(hit.block_pos);
                     }
-
-                    self.wireframe_renderer.update_position(
-                        &self.queue,
-                        hit.block_pos[0] as f32,
-                        hit.block_pos[1] as f32,
-                        hit.block_pos[2] as f32,
-                    );
-                    self.wireframe_renderer
-                        .render(&mut render_pass, &self.camera.bind_group);
                 }
 
-                // Render chunk boundaries if debug mode is enabled
-                if self.debug_mode {
-                    self.chunk_debug_renderer
-                        .render(&mut render_pass, &self.camera.bind_group);
-                }
-
-                // Always render slot UI on top
-                self.slot_ui.render(&mut render_pass);
+                self.wireframe_renderer.update_position(
+                    &self.queue,
+                    hit.block_pos[0] as f32,
+                    hit.block_pos[1] as f32,
+                    hit.block_pos[2] as f32,
+                );
+                self.wireframe_renderer
+                    .render(&mut render_pass, &self.camera.bind_group);
             }
+
+            // Render chunk boundaries if debug mode is enabled
+            if self.debug_mode {
+                self.chunk_debug_renderer
+                    .render(&mut render_pass, &self.camera.bind_group);
+            }
+
+            // Always render slot UI on top
+            self.slot_ui.render(&mut render_pass);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
