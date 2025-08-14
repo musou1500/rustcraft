@@ -1,33 +1,32 @@
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
+    keyboard::{KeyCode, PhysicalKey},
     window::Window,
-    keyboard::{PhysicalKey, KeyCode},
 };
-use wgpu::util::DeviceExt;
-use cgmath::prelude::*;
-use noise::{NoiseFn, Perlin};
 
-mod camera;
-mod terrain;
-mod voxel;
-mod light;
 mod blocks;
+mod camera;
+mod chunk_debug;
+mod light;
 mod progress_ui;
-mod texture_atlas;
 mod raycast;
-mod wireframe;
 mod slot_ui;
 mod structures;
+mod terrain;
+mod texture_atlas;
+mod voxel;
+mod wireframe;
 
 use camera::CameraSystem;
-use terrain::Terrain;
+use chunk_debug::ChunkDebugRenderer;
 use light::DirectionalLight;
 use progress_ui::ProgressUI;
-use texture_atlas::TextureAtlas;
-use raycast::{raycast_blocks, create_camera_ray, RaycastHit};
-use wireframe::WireframeRenderer;
+use raycast::{create_camera_ray, raycast_blocks, RaycastHit};
 use slot_ui::SlotUI;
+use terrain::Terrain;
+use texture_atlas::TextureAtlas;
+use wireframe::WireframeRenderer;
 
 struct State<'window> {
     surface: wgpu::Surface<'window>,
@@ -48,6 +47,7 @@ struct State<'window> {
     texture_atlas: TextureAtlas,
     texture_bind_group_layout: wgpu::BindGroupLayout,
     wireframe_renderer: WireframeRenderer,
+    chunk_debug_renderer: ChunkDebugRenderer,
     progress_ui: ProgressUI,
     slot_ui: SlotUI,
     window: &'window Window,
@@ -56,6 +56,7 @@ struct State<'window> {
     cursor_locked: bool,
     window_focused: bool,
     selected_block: Option<RaycastHit>,
+    debug_mode: bool,
 }
 
 impl<'window> State<'window> {
@@ -153,27 +154,28 @@ impl<'window> State<'window> {
             ..Default::default()
         });
 
-        let shadow_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Depth,
+        let shadow_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Depth,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
-                    count: None,
-                },
-            ],
-            label: Some("shadow_bind_group_layout"),
-        });
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                        count: None,
+                    },
+                ],
+                label: Some("shadow_bind_group_layout"),
+            });
 
         let shadow_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &shadow_bind_group_layout,
@@ -191,27 +193,28 @@ impl<'window> State<'window> {
         });
 
         // Create texture atlas bind group layout
-        let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-            label: Some("texture_bind_group_layout"),
-        });
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("texture_bind_group_layout"),
+            });
 
         // Create texture atlas
         let texture_atlas = TextureAtlas::new(&device, &queue, &texture_bind_group_layout);
@@ -227,11 +230,12 @@ impl<'window> State<'window> {
         });
 
         // Shadow pipeline layout
-        let shadow_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Shadow Pipeline Layout"),
-            bind_group_layouts: &[&light.bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let shadow_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Shadow Pipeline Layout"),
+                bind_group_layouts: &[&light.bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
         // Main render pipeline layout
         let render_pipeline_layout =
@@ -239,9 +243,9 @@ impl<'window> State<'window> {
                 label: Some("Render Pipeline Layout"),
                 bind_group_layouts: &[
                     &camera.bind_group_layout,
-                    &light.bind_group_layout, 
+                    &light.bind_group_layout,
                     &shadow_bind_group_layout,
-                    &texture_bind_group_layout
+                    &texture_bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             });
@@ -284,9 +288,18 @@ impl<'window> State<'window> {
             multiview: None,
         });
 
-        let wireframe_renderer = WireframeRenderer::new(&device, surface_format, &camera.bind_group_layout);
+        let wireframe_renderer =
+            WireframeRenderer::new(&device, surface_format, &camera.bind_group_layout);
+        let chunk_debug_renderer =
+            ChunkDebugRenderer::new(&device, surface_format, &camera.bind_group_layout);
         let progress_ui = ProgressUI::new(&device, surface_format);
-        let slot_ui = SlotUI::new(&device, surface_format, &texture_atlas, config.width, config.height);
+        let slot_ui = SlotUI::new(
+            &device,
+            surface_format,
+            &texture_atlas,
+            config.width,
+            config.height,
+        );
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
@@ -348,6 +361,7 @@ impl<'window> State<'window> {
             texture_atlas,
             texture_bind_group_layout,
             wireframe_renderer,
+            chunk_debug_renderer,
             progress_ui,
             slot_ui,
             window,
@@ -356,6 +370,7 @@ impl<'window> State<'window> {
             cursor_locked: true,
             window_focused: true,
             selected_block: None,
+            debug_mode: false,
         })
     }
 
@@ -365,46 +380,88 @@ impl<'window> State<'window> {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
-            
+
             // Update slot UI geometry for new window size (fixed 100px slots)
-            self.slot_ui.update_geometry(&self.device, &self.queue, new_size.width, new_size.height);
+            self.slot_ui.update_geometry(
+                &self.device,
+                &self.queue,
+                new_size.width,
+                new_size.height,
+            );
         }
     }
 
     fn input_window(&mut self, event: &WindowEvent) -> bool {
         // Handle slot selection first
         if let WindowEvent::KeyboardInput {
-            event: KeyEvent {
-                state: ElementState::Pressed,
-                physical_key: PhysicalKey::Code(key_code),
-                ..
-            },
-            ..
-        } = event {
-            match key_code {
-                KeyCode::Digit1 => { self.slot_ui.set_selected_slot(0, &self.queue); return true; },
-                KeyCode::Digit2 => { self.slot_ui.set_selected_slot(1, &self.queue); return true; },
-                KeyCode::Digit3 => { self.slot_ui.set_selected_slot(2, &self.queue); return true; },
-                KeyCode::Digit4 => { self.slot_ui.set_selected_slot(3, &self.queue); return true; },
-                KeyCode::Digit5 => { self.slot_ui.set_selected_slot(4, &self.queue); return true; },
-                KeyCode::Digit6 => { self.slot_ui.set_selected_slot(5, &self.queue); return true; },
-                KeyCode::Digit7 => { self.slot_ui.set_selected_slot(6, &self.queue); return true; },
-                KeyCode::Digit8 => { self.slot_ui.set_selected_slot(7, &self.queue); return true; },
-                KeyCode::Digit9 => { self.slot_ui.set_selected_slot(8, &self.queue); return true; },
-                KeyCode::Digit0 => { self.slot_ui.set_selected_slot(9, &self.queue); return true; },
-                KeyCode::Delete | KeyCode::Backspace => { 
-                    self.slot_ui.clear_selected_slot(); 
-                    self.slot_ui.update_inventory_buffer(&self.queue);
-                    return true; 
+            event:
+                KeyEvent {
+                    state: ElementState::Pressed,
+                    physical_key: PhysicalKey::Code(key_code),
+                    ..
                 },
+            ..
+        } = event
+        {
+            match key_code {
+                KeyCode::Digit1 => {
+                    self.slot_ui.set_selected_slot(0, &self.queue);
+                    return true;
+                }
+                KeyCode::Digit2 => {
+                    self.slot_ui.set_selected_slot(1, &self.queue);
+                    return true;
+                }
+                KeyCode::Digit3 => {
+                    self.slot_ui.set_selected_slot(2, &self.queue);
+                    return true;
+                }
+                KeyCode::Digit4 => {
+                    self.slot_ui.set_selected_slot(3, &self.queue);
+                    return true;
+                }
+                KeyCode::Digit5 => {
+                    self.slot_ui.set_selected_slot(4, &self.queue);
+                    return true;
+                }
+                KeyCode::Digit6 => {
+                    self.slot_ui.set_selected_slot(5, &self.queue);
+                    return true;
+                }
+                KeyCode::Digit7 => {
+                    self.slot_ui.set_selected_slot(6, &self.queue);
+                    return true;
+                }
+                KeyCode::Digit8 => {
+                    self.slot_ui.set_selected_slot(7, &self.queue);
+                    return true;
+                }
+                KeyCode::Digit9 => {
+                    self.slot_ui.set_selected_slot(8, &self.queue);
+                    return true;
+                }
+                KeyCode::Digit0 => {
+                    self.slot_ui.set_selected_slot(9, &self.queue);
+                    return true;
+                }
+                KeyCode::Delete | KeyCode::Backspace => {
+                    self.slot_ui.clear_selected_slot();
+                    self.slot_ui.update_inventory_buffer(&self.queue);
+                    return true;
+                }
+                KeyCode::F3 => {
+                    self.debug_mode = !self.debug_mode;
+                    println!("Debug mode: {}", if self.debug_mode { "ON" } else { "OFF" });
+                    return true;
+                }
                 _ => {}
             }
         }
-        
+
         // If not a slot key, pass to camera
         self.camera.process_window_events(event)
     }
-    
+
     fn input_device(&mut self, event: &DeviceEvent) -> bool {
         // Only process mouse movement when cursor is locked and window is focused
         if self.cursor_locked && self.window_focused {
@@ -413,28 +470,34 @@ impl<'window> State<'window> {
             false
         }
     }
-    
+
     fn toggle_cursor_lock(&mut self) {
         self.cursor_locked = !self.cursor_locked;
         self.update_cursor_state();
     }
-    
+
     fn update_cursor_state(&mut self) {
         if self.cursor_locked && self.window_focused {
             // Game mode: confine cursor to window and hide it
-            let _ = self.window.set_cursor_grab(winit::window::CursorGrabMode::Confined);
+            let _ = self
+                .window
+                .set_cursor_grab(winit::window::CursorGrabMode::Confined);
             self.window.set_cursor_visible(false);
         } else {
             // Desktop mode: free cursor and show it
-            let _ = self.window.set_cursor_grab(winit::window::CursorGrabMode::None);
+            let _ = self
+                .window
+                .set_cursor_grab(winit::window::CursorGrabMode::None);
             self.window.set_cursor_visible(true);
-            
+
             // Center cursor when switching to desktop mode
             if !self.cursor_locked {
                 let window_size = self.window.inner_size();
                 let center_x = window_size.width as f64 / 2.0;
                 let center_y = window_size.height as f64 / 2.0;
-                let _ = self.window.set_cursor_position(winit::dpi::PhysicalPosition::new(center_x, center_y));
+                let _ = self
+                    .window
+                    .set_cursor_position(winit::dpi::PhysicalPosition::new(center_x, center_y));
             }
         }
     }
@@ -443,60 +506,81 @@ impl<'window> State<'window> {
         self.camera.update(dt, &self.terrain);
         self.camera.update_buffer(&self.queue);
         self.light.update_buffer(&self.queue);
-        
+
         let camera_pos = self.camera.get_position();
         self.terrain.update(camera_pos, &self.device);
-        
+
+        // Update chunk debug renderer if debug mode is enabled
+        if self.debug_mode {
+            let chunk_positions = self.terrain.get_loaded_chunk_positions();
+            self.chunk_debug_renderer
+                .update_chunks(&self.device, &self.queue, &chunk_positions);
+        }
+
         // Update block selection (only when cursor is locked and window focused)
         if self.cursor_locked && self.window_focused {
             self.update_block_selection();
-            
+
             // Check for block interaction (place or break)
             if self.camera.was_left_mouse_clicked() {
                 self.handle_left_click();
             }
-            
-            // Check for putting block in slot  
+
+            // Check for putting block in slot
             if self.camera.was_right_mouse_clicked() {
                 self.put_selected_block_in_slot();
             }
         }
     }
-    
+
     fn update_block_selection(&mut self) {
         let camera_pos = self.camera.get_position();
         let camera_yaw = self.camera.get_yaw();
         let camera_pitch = self.camera.get_pitch();
-        
+
         let ray = create_camera_ray(camera_pos, camera_yaw, camera_pitch);
         let new_selection = raycast_blocks(ray, 5.0, &self.terrain); // 5 block reach distance
-        
+
         // Debug: Print when selection changes
         match (&self.selected_block, &new_selection) {
             (None, Some(hit)) => {
                 // Verify this is actually a solid block
-                let is_solid = self.terrain.is_block_solid(hit.block_pos[0], hit.block_pos[1], hit.block_pos[2]);
-                println!("Block selected at: {:?} (is_solid: {})", hit.block_pos, is_solid);
+                let is_solid = self.terrain.is_block_solid(
+                    hit.block_pos[0],
+                    hit.block_pos[1],
+                    hit.block_pos[2],
+                );
+                println!(
+                    "Block selected at: {:?} (is_solid: {})",
+                    hit.block_pos, is_solid
+                );
                 if !is_solid {
                     println!("WARNING: Selected block is not solid! This shouldn't happen.");
                 }
-            },
+            }
             (Some(_), None) => {
                 println!("Block deselected");
-            },
+            }
             (Some(old), Some(new)) if old.block_pos != new.block_pos => {
-                let is_solid = self.terrain.is_block_solid(new.block_pos[0], new.block_pos[1], new.block_pos[2]);
-                println!("Block selection changed from {:?} to {:?} (is_solid: {})", old.block_pos, new.block_pos, is_solid);
+                let is_solid = self.terrain.is_block_solid(
+                    new.block_pos[0],
+                    new.block_pos[1],
+                    new.block_pos[2],
+                );
+                println!(
+                    "Block selection changed from {:?} to {:?} (is_solid: {})",
+                    old.block_pos, new.block_pos, is_solid
+                );
                 if !is_solid {
                     println!("WARNING: Selected block is not solid! This shouldn't happen.");
                 }
-            },
+            }
             _ => {} // No change
         }
-        
+
         self.selected_block = new_selection;
     }
-    
+
     fn handle_left_click(&mut self) {
         if let Some(hit) = self.selected_block {
             // Check if current slot has a block
@@ -506,17 +590,20 @@ impl<'window> State<'window> {
             } else {
                 // Remove block mode (original behavior)
                 println!("Breaking block at: {:?}", hit.block_pos);
-                
+
                 // Actually remove the block from terrain
                 let removed_block_type = self.terrain.remove_block(
-                    hit.block_pos[0], 
-                    hit.block_pos[1], 
-                    hit.block_pos[2], 
-                    &self.device
+                    hit.block_pos[0],
+                    hit.block_pos[1],
+                    hit.block_pos[2],
+                    &self.device,
                 );
-                
+
                 if let Some(block_type) = removed_block_type {
-                    println!("Successfully removed {:?} block at: {:?}", block_type, hit.block_pos);
+                    println!(
+                        "Successfully removed {:?} block at: {:?}",
+                        block_type, hit.block_pos
+                    );
                     // Clear selection since the block is gone
                     self.selected_block = None;
                 } else {
@@ -525,7 +612,7 @@ impl<'window> State<'window> {
             }
         }
     }
-    
+
     fn place_block_from_slot(&mut self, hit: raycast::RaycastHit, block_type: blocks::BlockType) {
         // Calculate placement position based on face normal
         let placement_pos = [
@@ -533,38 +620,44 @@ impl<'window> State<'window> {
             hit.block_pos[1] + hit.face_normal.y as i32,
             hit.block_pos[2] + hit.face_normal.z as i32,
         ];
-        
-        println!("Attempting to place {:?} block at: {:?}", block_type, placement_pos);
-        
+
+        println!(
+            "Attempting to place {:?} block at: {:?}",
+            block_type, placement_pos
+        );
+
         // Validate placement position
         if !self.is_valid_placement_position(placement_pos) {
             println!("Invalid placement position!");
             return;
         }
-        
+
         // Add block to terrain
         let success = self.terrain.add_block(
             placement_pos[0],
             placement_pos[1],
             placement_pos[2],
             block_type,
-            &self.device
+            &self.device,
         );
-        
+
         if success {
-            println!("Successfully placed {:?} block at: {:?}", block_type, placement_pos);
+            println!(
+                "Successfully placed {:?} block at: {:?}",
+                block_type, placement_pos
+            );
             // Note: We don't remove the block from inventory (infinite blocks)
         } else {
             println!("Failed to place block at: {:?}", placement_pos);
         }
     }
-    
+
     fn is_valid_placement_position(&self, pos: [i32; 3]) -> bool {
         // Check if position is within world bounds
-        if pos[1] < 0 || pos[1] >= 24 { // WORLD_HEIGHT = 24
+        if pos[1] < 0 || pos[1] >= terrain::WORLD_HEIGHT as i32 {
             return false;
         }
-        
+
         // Check if player would collide with placed block
         let player_eye_pos = self.camera.get_position();
         // Convert eye position to feet position (eyes are 1.6 blocks above feet)
@@ -573,7 +666,7 @@ impl<'window> State<'window> {
         let player_feet_block_y = player_feet_y.floor() as i32;
         let player_head_block_y = (player_feet_y + 1.8).floor() as i32;
         let player_block_z = player_eye_pos.z.floor() as i32;
-        
+
         // Player occupies space from feet to head (1.8 blocks tall)
         if pos[0] == player_block_x && pos[2] == player_block_z {
             for y in player_feet_block_y..=player_head_block_y {
@@ -583,22 +676,26 @@ impl<'window> State<'window> {
                 }
             }
         }
-        
+
         true
     }
-    
+
     fn put_selected_block_in_slot(&mut self) {
         if let Some(hit) = self.selected_block {
             // Get the block type at the selected position
-            if let Some(block_type) = self.terrain.get_block_type(
-                hit.block_pos[0], 
-                hit.block_pos[1], 
-                hit.block_pos[2]
-            ) {
+            if let Some(block_type) =
+                self.terrain
+                    .get_block_type(hit.block_pos[0], hit.block_pos[1], hit.block_pos[2])
+            {
                 // Don't put air blocks in slots
                 if block_type != blocks::BlockType::Air {
-                    self.slot_ui.put_block_in_selected_slot(block_type, &self.queue);
-                    println!("Put {:?} block in slot {}", block_type, self.slot_ui.get_selected_slot());
+                    self.slot_ui
+                        .put_block_in_selected_slot(block_type, &self.queue);
+                    println!(
+                        "Put {:?} block in slot {}",
+                        block_type,
+                        self.slot_ui.get_selected_slot()
+                    );
                 }
             }
         }
@@ -608,20 +705,24 @@ impl<'window> State<'window> {
         // Update progress UI
         let progress = self.terrain.progress.get_progress();
         let is_generating = self.terrain.progress.is_generating;
-        
+
         // Calculate number of indices for rendering
         if is_generating {
             // Background bar (6 indices) + progress fill (6 indices if progress > 0) + loading text (~200 indices)
             let progress_fill_indices = if progress > 0.0 { 6 } else { 0 };
             self.last_progress_indices = 6 + progress_fill_indices + 210; // Approximate for loading text
-            
-            self.progress_ui.update_progress(&self.device, &self.queue, progress, is_generating);
-            
+
+            self.progress_ui
+                .update_progress(&self.device, &self.queue, progress, is_generating);
+
             // Update window title
             if progress >= 1.0 {
                 self.window.set_title("Voxel Game - Ready!");
             } else {
-                self.window.set_title(&format!("Voxel Game - Generating Terrain {:.0}%", progress * 100.0));
+                self.window.set_title(&format!(
+                    "Voxel Game - Generating Terrain {:.0}%",
+                    progress * 100.0
+                ));
             }
         } else {
             self.last_progress_indices = 0;
@@ -630,7 +731,7 @@ impl<'window> State<'window> {
                 self.last_progress_output = -1.0;
             }
         }
-        
+
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -722,7 +823,11 @@ impl<'window> State<'window> {
 
             if self.terrain.progress.is_generating {
                 // Render progress UI during generation
-                self.progress_ui.render(&mut render_pass, is_generating, self.last_progress_indices);
+                self.progress_ui.render(
+                    &mut render_pass,
+                    is_generating,
+                    self.last_progress_indices,
+                );
             } else {
                 // Render normal terrain
                 render_pass.set_pipeline(&self.render_pipeline);
@@ -731,7 +836,7 @@ impl<'window> State<'window> {
                 render_pass.set_bind_group(2, &self.shadow_bind_group, &[]);
                 render_pass.set_bind_group(3, &self.texture_atlas.bind_group, &[]);
                 self.terrain.render(&mut render_pass);
-                
+
                 // Render block selection wireframe
                 if let Some(hit) = self.selected_block {
                     // Debug: Print when wireframe is being rendered
@@ -742,17 +847,24 @@ impl<'window> State<'window> {
                             LAST_WIREFRAME_POS = Some(hit.block_pos);
                         }
                     }
-                    
+
                     self.wireframe_renderer.update_position(
-                        &self.device, 
-                        &self.queue, 
-                        hit.block_pos[0] as f32, 
-                        hit.block_pos[1] as f32, 
-                        hit.block_pos[2] as f32
+                        &self.device,
+                        &self.queue,
+                        hit.block_pos[0] as f32,
+                        hit.block_pos[1] as f32,
+                        hit.block_pos[2] as f32,
                     );
-                    self.wireframe_renderer.render(&mut render_pass, &self.camera.bind_group);
+                    self.wireframe_renderer
+                        .render(&mut render_pass, &self.camera.bind_group);
                 }
-                
+
+                // Render chunk boundaries if debug mode is enabled
+                if self.debug_mode {
+                    self.chunk_debug_renderer
+                        .render(&mut render_pass, &self.camera.bind_group);
+                }
+
                 // Always render slot UI on top
                 self.slot_ui.render(&mut render_pass);
             }
@@ -767,9 +879,9 @@ impl<'window> State<'window> {
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
-    
+
     println!("🎮 Starting Voxel Game...");
-    
+
     // Initialize the block registry
     blocks::init_block_registry();
 
@@ -791,7 +903,7 @@ fn main() -> anyhow::Result<()> {
     let window_id = window.id();
     let mut state = pollster::block_on(State::new(&window))?;
     let mut last_render_time = std::time::Instant::now();
-    
+
     println!("🌍 Use WASD to move, mouse to look around, Space to jump, Ctrl to run");
     println!("🖱️  Press ESC to toggle cursor lock/unlock (currently locked)");
     println!("🔨 Left click to break blocks (bright red outline shows selected block)");
@@ -855,7 +967,7 @@ fn main() -> anyhow::Result<()> {
             _ => {}
         }
         elwt.set_control_flow(ControlFlow::Poll);
-    });
+    })?;
 
     Ok(())
 }

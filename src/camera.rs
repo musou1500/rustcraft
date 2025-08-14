@@ -322,8 +322,7 @@ impl CameraController {
         let block_z = z.floor() as i32;
 
         // Search downward for the highest solid block
-        for y in (0..24).rev() {
-            // WORLD_HEIGHT = 24
+        for y in (0..crate::terrain::WORLD_HEIGHT as i32).rev() {
             if terrain.is_block_solid(block_x, y, block_z) {
                 // Return eye level position (feet position + eye height)
                 return (y + 1) as f32 + self.eye_height;
