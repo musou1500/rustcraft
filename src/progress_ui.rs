@@ -41,11 +41,12 @@ impl ProgressUI {
             source: wgpu::ShaderSource::Wgsl(include_str!("progress_ui.wgsl").into()),
         });
 
-        let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Progress UI Pipeline Layout"),
-            bind_group_layouts: &[],
-            push_constant_ranges: &[],
-        });
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Progress UI Pipeline Layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Progress UI Pipeline"),
@@ -120,10 +121,22 @@ impl ProgressUI {
 
         // Background bar (dark gray)
         vertices.extend_from_slice(&[
-            UIVertex { position: [bar_x, bar_y], color: [0.2, 0.2, 0.2] },
-            UIVertex { position: [bar_x + bar_width, bar_y], color: [0.2, 0.2, 0.2] },
-            UIVertex { position: [bar_x + bar_width, bar_y + bar_height], color: [0.2, 0.2, 0.2] },
-            UIVertex { position: [bar_x, bar_y + bar_height], color: [0.2, 0.2, 0.2] },
+            UIVertex {
+                position: [bar_x, bar_y],
+                color: [0.2, 0.2, 0.2],
+            },
+            UIVertex {
+                position: [bar_x + bar_width, bar_y],
+                color: [0.2, 0.2, 0.2],
+            },
+            UIVertex {
+                position: [bar_x + bar_width, bar_y + bar_height],
+                color: [0.2, 0.2, 0.2],
+            },
+            UIVertex {
+                position: [bar_x, bar_y + bar_height],
+                color: [0.2, 0.2, 0.2],
+            },
         ]);
 
         // Background bar indices
@@ -141,19 +154,35 @@ impl ProgressUI {
             };
 
             let fill_vertices = [
-                UIVertex { position: [bar_x, bar_y], color },
-                UIVertex { position: [bar_x + progress_width, bar_y], color },
-                UIVertex { position: [bar_x + progress_width, bar_y + bar_height], color },
-                UIVertex { position: [bar_x, bar_y + bar_height], color },
+                UIVertex {
+                    position: [bar_x, bar_y],
+                    color,
+                },
+                UIVertex {
+                    position: [bar_x + progress_width, bar_y],
+                    color,
+                },
+                UIVertex {
+                    position: [bar_x + progress_width, bar_y + bar_height],
+                    color,
+                },
+                UIVertex {
+                    position: [bar_x, bar_y + bar_height],
+                    color,
+                },
             ];
 
             let vertex_offset = vertices.len() as u16;
             vertices.extend_from_slice(&fill_vertices);
-            
+
             // Progress fill indices
             indices.extend_from_slice(&[
-                vertex_offset, vertex_offset + 1, vertex_offset + 2,
-                vertex_offset + 2, vertex_offset + 3, vertex_offset,
+                vertex_offset,
+                vertex_offset + 1,
+                vertex_offset + 2,
+                vertex_offset + 2,
+                vertex_offset + 3,
+                vertex_offset,
             ]);
         }
 
@@ -166,36 +195,100 @@ impl ProgressUI {
         // Simple pattern for "LOADING" using blocks
         let loading_pattern = [
             // L
-            [0, 0], [0, 1], [0, 2], [0, 3], [1, 0],
+            [0, 0],
+            [0, 1],
+            [0, 2],
+            [0, 3],
+            [1, 0],
             // O
-            [3, 0], [3, 1], [3, 2], [3, 3], [4, 0], [4, 3], [5, 0], [5, 1], [5, 2], [5, 3],
+            [3, 0],
+            [3, 1],
+            [3, 2],
+            [3, 3],
+            [4, 0],
+            [4, 3],
+            [5, 0],
+            [5, 1],
+            [5, 2],
+            [5, 3],
             // A
-            [7, 0], [7, 1], [7, 2], [7, 3], [8, 2], [8, 3], [9, 0], [9, 1], [9, 2], [9, 3],
+            [7, 0],
+            [7, 1],
+            [7, 2],
+            [7, 3],
+            [8, 2],
+            [8, 3],
+            [9, 0],
+            [9, 1],
+            [9, 2],
+            [9, 3],
             // D
-            [11, 0], [11, 1], [11, 2], [11, 3], [12, 0], [12, 3], [13, 1], [13, 2],
+            [11, 0],
+            [11, 1],
+            [11, 2],
+            [11, 3],
+            [12, 0],
+            [12, 3],
+            [13, 1],
+            [13, 2],
             // I
-            [15, 0], [15, 1], [15, 2], [15, 3],
+            [15, 0],
+            [15, 1],
+            [15, 2],
+            [15, 3],
             // N
-            [17, 0], [17, 1], [17, 2], [17, 3], [18, 2], [19, 0], [19, 1], [19, 2], [19, 3],
+            [17, 0],
+            [17, 1],
+            [17, 2],
+            [17, 3],
+            [18, 2],
+            [19, 0],
+            [19, 1],
+            [19, 2],
+            [19, 3],
             // G
-            [21, 0], [21, 1], [21, 2], [21, 3], [22, 0], [22, 2], [23, 0], [23, 2], [23, 3],
+            [21, 0],
+            [21, 1],
+            [21, 2],
+            [21, 3],
+            [22, 0],
+            [22, 2],
+            [23, 0],
+            [23, 2],
+            [23, 3],
         ];
 
         for &[x, y] in &loading_pattern {
             let block_x = start_x + x as f32 * spacing;
             let block_y_pos = text_y + y as f32 * spacing;
-            
+
             let vertex_offset = vertices.len() as u16;
             vertices.extend_from_slice(&[
-                UIVertex { position: [block_x, block_y_pos], color: [1.0, 1.0, 1.0] },
-                UIVertex { position: [block_x + block_size, block_y_pos], color: [1.0, 1.0, 1.0] },
-                UIVertex { position: [block_x + block_size, block_y_pos + block_size], color: [1.0, 1.0, 1.0] },
-                UIVertex { position: [block_x, block_y_pos + block_size], color: [1.0, 1.0, 1.0] },
+                UIVertex {
+                    position: [block_x, block_y_pos],
+                    color: [1.0, 1.0, 1.0],
+                },
+                UIVertex {
+                    position: [block_x + block_size, block_y_pos],
+                    color: [1.0, 1.0, 1.0],
+                },
+                UIVertex {
+                    position: [block_x + block_size, block_y_pos + block_size],
+                    color: [1.0, 1.0, 1.0],
+                },
+                UIVertex {
+                    position: [block_x, block_y_pos + block_size],
+                    color: [1.0, 1.0, 1.0],
+                },
             ]);
 
             indices.extend_from_slice(&[
-                vertex_offset, vertex_offset + 1, vertex_offset + 2,
-                vertex_offset + 2, vertex_offset + 3, vertex_offset,
+                vertex_offset,
+                vertex_offset + 1,
+                vertex_offset + 2,
+                vertex_offset + 2,
+                vertex_offset + 3,
+                vertex_offset,
             ]);
         }
 
@@ -204,7 +297,12 @@ impl ProgressUI {
         queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&indices));
     }
 
-    pub fn render<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, is_generating: bool, num_indices: u32) {
+    pub fn render<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        is_generating: bool,
+        num_indices: u32,
+    ) {
         if !is_generating || num_indices == 0 {
             return;
         }

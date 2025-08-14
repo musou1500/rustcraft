@@ -1,5 +1,7 @@
 use crate::blocks::BlockType;
-use crate::chunk::{Chunk, ChunkData, ChunkGenerator, ChunkPos, ChunkBlocks, CHUNK_SIZE, WORLD_HEIGHT};
+use crate::chunk::{
+    Chunk, ChunkBlocks, ChunkData, ChunkGenerator, ChunkPos, CHUNK_SIZE, WORLD_HEIGHT,
+};
 use crate::terrain::Terrain;
 use crate::voxel::{create_cube_indices_selective, create_cube_vertices_selective};
 use cgmath::Point3;
@@ -85,8 +87,9 @@ impl World {
             let chunk_data_results: Vec<(ChunkPos, ChunkData, ChunkBlocks)> = chunks_to_generate
                 .into_par_iter()
                 .map(|chunk_pos| {
-                    let (chunk_data, block_array) =
-                        self.chunk_generator.generate_chunk(chunk_pos, &self.terrain);
+                    let (chunk_data, block_array) = self
+                        .chunk_generator
+                        .generate_chunk(chunk_pos, &self.terrain);
                     (chunk_pos, chunk_data, block_array)
                 })
                 .collect();
@@ -324,40 +327,71 @@ impl World {
         true
     }
 
-    fn update_boundary_chunks(&mut self, chunk_x: i32, chunk_z: i32, local_x: i32, local_z: i32, device: &wgpu::Device) {
+    fn update_boundary_chunks(
+        &mut self,
+        chunk_x: i32,
+        chunk_z: i32,
+        local_x: i32,
+        local_z: i32,
+        device: &wgpu::Device,
+    ) {
         // Check each direction for chunk boundaries
         if local_x == 0 {
-            let neighbor_pos = ChunkPos { x: chunk_x - 1, z: chunk_z };
+            let neighbor_pos = ChunkPos {
+                x: chunk_x - 1,
+                z: chunk_z,
+            };
             self.update_chunk_mesh(neighbor_pos, device);
         }
         if local_x == CHUNK_SIZE as i32 - 1 {
-            let neighbor_pos = ChunkPos { x: chunk_x + 1, z: chunk_z };
+            let neighbor_pos = ChunkPos {
+                x: chunk_x + 1,
+                z: chunk_z,
+            };
             self.update_chunk_mesh(neighbor_pos, device);
         }
         if local_z == 0 {
-            let neighbor_pos = ChunkPos { x: chunk_x, z: chunk_z - 1 };
+            let neighbor_pos = ChunkPos {
+                x: chunk_x,
+                z: chunk_z - 1,
+            };
             self.update_chunk_mesh(neighbor_pos, device);
         }
         if local_z == CHUNK_SIZE as i32 - 1 {
-            let neighbor_pos = ChunkPos { x: chunk_x, z: chunk_z + 1 };
+            let neighbor_pos = ChunkPos {
+                x: chunk_x,
+                z: chunk_z + 1,
+            };
             self.update_chunk_mesh(neighbor_pos, device);
         }
 
         // Check corners (block at corner of chunk affects 3 neighboring chunks)
         if local_x == 0 && local_z == 0 {
-            let neighbor_pos = ChunkPos { x: chunk_x - 1, z: chunk_z - 1 };
+            let neighbor_pos = ChunkPos {
+                x: chunk_x - 1,
+                z: chunk_z - 1,
+            };
             self.update_chunk_mesh(neighbor_pos, device);
         }
         if local_x == 0 && local_z == CHUNK_SIZE as i32 - 1 {
-            let neighbor_pos = ChunkPos { x: chunk_x - 1, z: chunk_z + 1 };
+            let neighbor_pos = ChunkPos {
+                x: chunk_x - 1,
+                z: chunk_z + 1,
+            };
             self.update_chunk_mesh(neighbor_pos, device);
         }
         if local_x == CHUNK_SIZE as i32 - 1 && local_z == 0 {
-            let neighbor_pos = ChunkPos { x: chunk_x + 1, z: chunk_z - 1 };
+            let neighbor_pos = ChunkPos {
+                x: chunk_x + 1,
+                z: chunk_z - 1,
+            };
             self.update_chunk_mesh(neighbor_pos, device);
         }
         if local_x == CHUNK_SIZE as i32 - 1 && local_z == CHUNK_SIZE as i32 - 1 {
-            let neighbor_pos = ChunkPos { x: chunk_x + 1, z: chunk_z + 1 };
+            let neighbor_pos = ChunkPos {
+                x: chunk_x + 1,
+                z: chunk_z + 1,
+            };
             self.update_chunk_mesh(neighbor_pos, device);
         }
     }

@@ -1,9 +1,8 @@
 use crate::blocks::{generation, BlockType};
-use crate::chunk::{ChunkPos, ChunkBlocks, CHUNK_SIZE, WORLD_HEIGHT, TERRAIN_MAX_HEIGHT};
+use crate::chunk::{ChunkBlocks, ChunkPos, CHUNK_SIZE, TERRAIN_MAX_HEIGHT, WORLD_HEIGHT};
 use noise::{NoiseFn, Perlin};
 
 const BASE_HEIGHT: usize = 8; // Minimum terrain height
-
 
 /// Pure terrain generation with noise functions
 pub struct Terrain {
@@ -74,16 +73,6 @@ impl Terrain {
 
         chunk_blocks
     }
-
-
-
-
-
-
-
-
-
-
 
     /// Calculate terrain height at any world position
     pub fn calculate_height_at(&self, world_x: i32, world_z: i32) -> usize {

@@ -1,4 +1,3 @@
-
 pub struct TextureAtlas {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
@@ -7,23 +6,34 @@ pub struct TextureAtlas {
 }
 
 impl TextureAtlas {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
         // Create a simple 4x4 texture atlas with Minecraft-like block textures
         // Each texture is 16x16 pixels for a total of 64x64 atlas
         let atlas_size = 64u32;
         let tile_size = 16u32;
-        
+
         // Generate procedural textures for each block type
         let mut atlas_data = vec![0u8; (atlas_size * atlas_size * 4) as usize]; // RGBA
-        
+
         // Fill the atlas with different textures
         for tile_y in 0..4 {
             for tile_x in 0..4 {
                 let texture_id = tile_y * 4 + tile_x;
-                generate_texture(&mut atlas_data, atlas_size, tile_x * tile_size, tile_y * tile_size, tile_size, texture_id);
+                generate_texture(
+                    &mut atlas_data,
+                    atlas_size,
+                    tile_x * tile_size,
+                    tile_y * tile_size,
+                    tile_size,
+                    texture_id,
+                );
             }
         }
-        
+
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: atlas_size,
@@ -38,7 +48,7 @@ impl TextureAtlas {
             label: Some("Texture Atlas"),
             view_formats: &[],
         });
-        
+
         queue.write_texture(
             wgpu::ImageCopyTexture {
                 texture: &texture,
@@ -58,9 +68,9 @@ impl TextureAtlas {
                 depth_or_array_layers: 1,
             },
         );
-        
+
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
+
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -70,7 +80,7 @@ impl TextureAtlas {
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
-        
+
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
             entries: &[
@@ -85,7 +95,7 @@ impl TextureAtlas {
             ],
             label: Some("Texture Atlas Bind Group"),
         });
-        
+
         Self {
             texture,
             view,
@@ -96,30 +106,37 @@ impl TextureAtlas {
 }
 
 // Generate procedural textures for different block types
-fn generate_texture(atlas_data: &mut [u8], atlas_width: u32, start_x: u32, start_y: u32, size: u32, texture_id: u32) {
+fn generate_texture(
+    atlas_data: &mut [u8],
+    atlas_width: u32,
+    start_x: u32,
+    start_y: u32,
+    size: u32,
+    texture_id: u32,
+) {
     for y in 0..size {
         for x in 0..size {
             let atlas_x = start_x + x;
             let atlas_y = start_y + y;
             let index = ((atlas_y * atlas_width + atlas_x) * 4) as usize;
-            
+
             let (r, g, b) = match texture_id {
-                0 => generate_stone_texture(x, y, size),     // Stone
-                1 => generate_dirt_texture(x, y, size),      // Dirt
-                2 => generate_grass_top_texture(x, y, size), // Grass Top
+                0 => generate_stone_texture(x, y, size),      // Stone
+                1 => generate_dirt_texture(x, y, size),       // Dirt
+                2 => generate_grass_top_texture(x, y, size),  // Grass Top
                 3 => generate_grass_side_texture(x, y, size), // Grass Side
-                4 => generate_sand_texture(x, y, size),      // Sand
-                5 => generate_water_texture(x, y, size),     // Water
-                6 => generate_wood_top_texture(x, y, size),  // Wood Top
-                7 => generate_wood_side_texture(x, y, size), // Wood Side
-                8 => generate_leaves_texture(x, y, size),    // Leaves
-                9 => generate_coal_texture(x, y, size),      // Coal
-                10 => generate_iron_texture(x, y, size),     // Iron
-                11 => generate_gold_texture(x, y, size),     // Gold
-                12 => generate_snow_texture(x, y, size),     // Snow
-                _ => (128, 128, 128), // Default gray
+                4 => generate_sand_texture(x, y, size),       // Sand
+                5 => generate_water_texture(x, y, size),      // Water
+                6 => generate_wood_top_texture(x, y, size),   // Wood Top
+                7 => generate_wood_side_texture(x, y, size),  // Wood Side
+                8 => generate_leaves_texture(x, y, size),     // Leaves
+                9 => generate_coal_texture(x, y, size),       // Coal
+                10 => generate_iron_texture(x, y, size),      // Iron
+                11 => generate_gold_texture(x, y, size),      // Gold
+                12 => generate_snow_texture(x, y, size),      // Snow
+                _ => (128, 128, 128),                         // Default gray
             };
-            
+
             if index + 3 < atlas_data.len() {
                 atlas_data[index] = r;
                 atlas_data[index + 1] = g;
@@ -202,7 +219,11 @@ fn generate_wood_side_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
     let base_b = 45;
     let noise = ((x * 7 + y * 11) % 17) as f32 / 17.0 * 20.0;
     match stripe {
-        0 => ((base_r as f32 + noise) as u8, (base_g as f32 + noise * 0.7) as u8, (base_b as f32 + noise * 0.5) as u8),
+        0 => (
+            (base_r as f32 + noise) as u8,
+            (base_g as f32 + noise * 0.7) as u8,
+            (base_b as f32 + noise * 0.5) as u8,
+        ),
         1 => ((base_r - 15) as u8, (base_g - 10) as u8, (base_b - 8) as u8),
         _ => ((base_r + 10) as u8, (base_g + 8) as u8, (base_b + 5) as u8),
     }

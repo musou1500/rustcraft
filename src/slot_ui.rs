@@ -335,12 +335,7 @@ impl SlotUI {
         }
     }
 
-    pub fn update_geometry(
-        &self,
-        queue: &wgpu::Queue,
-        window_width: u32,
-        window_height: u32,
-    ) {
+    pub fn update_geometry(&self, queue: &wgpu::Queue, window_width: u32, window_height: u32) {
         let (vertices, _) = Self::create_slot_geometry(window_width, window_height);
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
     }

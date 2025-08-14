@@ -231,7 +231,7 @@ impl ChunkGenerator {
 impl Chunk {
     pub fn from_data(chunk_data: ChunkData, device: &wgpu::Device) -> Self {
         use wgpu::util::DeviceExt;
-        
+
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Chunk Vertex Buffer"),
             contents: bytemuck::cast_slice(&chunk_data.vertices),

@@ -289,11 +289,7 @@ impl CameraController {
         }
     }
 
-    fn check_collision(
-        &self,
-        eye_position: Point3<f32>,
-        world: &crate::world::World,
-    ) -> bool {
+    fn check_collision(&self, eye_position: Point3<f32>, world: &crate::world::World) -> bool {
         // Convert eye position to feet position
         let feet_position = Point3::new(
             eye_position.x,

@@ -384,11 +384,8 @@ impl<'window> State<'window> {
             self.surface.configure(&self.device, &self.config);
 
             // Update slot UI geometry for new window size (fixed 100px slots)
-            self.slot_ui.update_geometry(
-                &self.queue,
-                new_size.width,
-                new_size.height,
-            );
+            self.slot_ui
+                .update_geometry(&self.queue, new_size.width, new_size.height);
         }
     }
 
@@ -546,11 +543,9 @@ impl<'window> State<'window> {
         match (&self.selected_block, &new_selection) {
             (None, Some(hit)) => {
                 // Verify this is actually a solid block
-                let is_solid = self.world.is_block_solid(
-                    hit.block_pos[0],
-                    hit.block_pos[1],
-                    hit.block_pos[2],
-                );
+                let is_solid =
+                    self.world
+                        .is_block_solid(hit.block_pos[0], hit.block_pos[1], hit.block_pos[2]);
                 println!(
                     "Block selected at: {:?} (is_solid: {})",
                     hit.block_pos, is_solid
@@ -563,11 +558,9 @@ impl<'window> State<'window> {
                 println!("Block deselected");
             }
             (Some(old), Some(new)) if old.block_pos != new.block_pos => {
-                let is_solid = self.world.is_block_solid(
-                    new.block_pos[0],
-                    new.block_pos[1],
-                    new.block_pos[2],
-                );
+                let is_solid =
+                    self.world
+                        .is_block_solid(new.block_pos[0], new.block_pos[1], new.block_pos[2]);
                 println!(
                     "Block selection changed from {:?} to {:?} (is_solid: {})",
                     old.block_pos, new.block_pos, is_solid
