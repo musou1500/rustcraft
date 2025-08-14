@@ -33,13 +33,29 @@ cargo check
 
 ### Main Components
 
+**Core System Files:**
 - **main.rs**: Entry point, event loop, and main State struct that orchestrates all systems
-- **terrain.rs**: Chunk-based world generation with noise-based terrain using Perlin noise
-- **camera.rs**: First-person camera system with physics (gravity, jumping, collision detection)  
+- **world.rs**: High-level world management, chunk loading/unloading, and block modification
+- **camera.rs**: First-person camera system with physics (gravity, jumping, collision detection)
+
+**Terrain & Generation:**
+- **terrain.rs**: Pure terrain generation with noise functions (height, biome, ore calculations)
+- **chunk.rs**: Chunk data structures, generation orchestration, and mesh building with face culling
+- **structures.rs**: Procedural structure generation system (trees, houses) with biome-aware placement
+
+**Rendering & Graphics:**
 - **voxel.rs**: Vertex data structures and cube mesh generation functions
-- **blocks.rs**: Block type definitions, material properties, and texture mapping registry
-- **raycast.rs**: Ray-casting for block selection and interaction
 - **texture_atlas.rs**: Manages block textures in a texture atlas
+- **wireframe.rs**: Block selection wireframe overlay rendering
+
+**Game Systems:**
+- **blocks.rs**: Block type definitions, material properties, texture mapping registry, and generation logic
+- **raycast.rs**: Ray-casting for block selection and interaction
+- **slot_ui.rs**: Inventory slot rendering and UI management
+- **light.rs**: Lighting system and shadow mapping
+
+**Debug & Development:**
+- **chunk_debug.rs**: Debug visualization and chunk information display
 
 ### Rendering Pipeline
 
@@ -56,11 +72,14 @@ Shaders are located in src/ as .wgsl files:
 ### Key Systems
 
 **Terrain Generation**: 
-- 16x16 chunk system with 24-block height limit
-- Multi-octave Perlin noise for realistic height variation
-- Biome-based block selection (snow, sand, grass)
-- Parallel chunk generation using rayon
-- Face culling optimization for performance
+- 16x16 chunk system with 64-block world height limit (natural terrain limited to 24 blocks)
+- Separated terrain generation from structure placement for better modularity
+- Multi-octave Perlin noise for realistic height variation with centralized calculation methods
+- Biome-aware block selection (snow, sand, grass) with dedicated biome noise
+- Procedural structure system with trees (Oak, Birch, Pine) and houses (Small, Medium)
+- Structure placement using dedicated noise and spacing algorithms with cross-chunk support
+- Parallel chunk generation using rayon with pre-computed noise values
+- Advanced face culling optimization for performance
 
 **Block System**:
 - Registry pattern for block types and properties
@@ -104,13 +123,16 @@ Shaders are located in src/ as .wgsl files:
 
 ### Coordinate System
 - X: East/West
-- Y: Up/Down (0 = bottom, 23 = top)
+- Y: Up/Down (0 = bottom, 63 = top for world height, natural terrain 0-23)
 - Z: North/South
-- Chunks are 16x16 blocks horizontally, 24 blocks tall
+- Chunks are 16x16 blocks horizontally, 64 blocks tall (world height)
+- Natural terrain generation limited to first 24 blocks vertically
 - World coordinates are converted to chunk coordinates for terrain lookup
 
 ### Common Modifications
-- Adjust `RENDER_DISTANCE` in terrain.rs to change view distance
-- Modify noise parameters in `generate_chunk_data()` for different terrain
+- Adjust `RENDER_DISTANCE` in world.rs to change view distance
+- Modify noise parameters in `Terrain::calculate_height_at()` for different terrain generation
+- Add new structure types by implementing the `Structure` trait in structures.rs
+- Adjust structure placement frequency by modifying `should_place_structure()` thresholds
 - Add new UI elements by following the pattern in slot_ui.rs
 - Extend the block registry for new materials and textures
