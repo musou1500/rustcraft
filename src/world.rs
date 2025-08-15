@@ -9,7 +9,6 @@ use std::collections::HashMap;
 
 const RENDER_DISTANCE: i32 = 4;
 
-
 pub struct World {
     chunks: HashMap<ChunkPos, Chunk>,
     terrain: Terrain,
@@ -53,7 +52,6 @@ impl World {
 
         // Generate chunk data in parallel
         if !chunks_to_generate.is_empty() {
-
             // Generate chunks in parallel
             use rayon::prelude::*;
             let chunk_data_results: Vec<(ChunkPos, ChunkData, ChunkBlocks)> = chunks_to_generate
@@ -72,7 +70,6 @@ impl World {
                 self.chunks.insert(chunk_pos, chunk);
                 self.chunk_blocks.insert(chunk_pos, block_array);
             }
-
         }
 
         // Remove distant chunks
@@ -175,11 +172,6 @@ impl World {
 
         // Get the block type before removing it
         let block_type = self.get_block_type(world_x, world_y, world_z);
-
-        println!(
-            "Removing block at world position: ({}, {}, {})",
-            world_x, world_y, world_z
-        );
 
         // Convert world coordinates to chunk coordinates
         let chunk_x = world_x.div_euclid(CHUNK_SIZE as i32);
@@ -477,5 +469,9 @@ impl World {
     /// Get all currently loaded chunk positions for debug rendering
     pub fn get_loaded_chunk_positions(&self) -> Vec<ChunkPos> {
         self.chunks.keys().copied().collect()
+    }
+
+    pub fn get_terrain(&self) -> &Terrain {
+        &self.terrain
     }
 }

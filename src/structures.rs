@@ -1,3 +1,4 @@
+use crate::biome::Biome;
 use crate::blocks::BlockType;
 use crate::chunk::CHUNK_SIZE;
 use noise::{NoiseFn, Perlin};
@@ -41,29 +42,43 @@ impl TreeStructure {
     }
 
     /// Choose a random tree type based on biome
-    pub fn random_for_biome(biome_value: f64, rng: &mut StdRng) -> Self {
-        let tree_type = if biome_value < -0.3 {
-            // Cold biome - more pine trees
-            if rng.gen::<f32>() < 0.7 {
-                TreeType::Pine
-            } else {
+    pub fn random_for_biome(biome: Biome, rng: &mut StdRng) -> Self {
+        let tree_type = match biome {
+            Biome::Tundra | Biome::Mountain => {
+                // Cold biomes - mostly pine trees
+                if rng.gen::<f32>() < 0.8 {
+                    TreeType::Pine
+                } else {
+                    TreeType::Oak
+                }
+            }
+            Biome::Desert => {
+                // Desert biome - very sparse, mostly oak (representing hardy trees)
                 TreeType::Oak
             }
-        } else if biome_value > 0.3 {
-            // Warm biome - more birch trees
-            if rng.gen::<f32>() < 0.6 {
-                TreeType::Birch
-            } else {
-                TreeType::Oak
+            Biome::Forest => {
+                // Forest biome - dense mixed forest
+                match rng.gen_range(0..10) {
+                    0..=2 => TreeType::Pine,
+                    3..=6 => TreeType::Oak,
+                    _ => TreeType::Birch,
+                }
             }
-        } else {
-            // Temperate - mostly oak
-            if rng.gen::<f32>() < 0.7 {
-                TreeType::Oak
-            } else if rng.gen::<f32>() < 0.5 {
-                TreeType::Birch
-            } else {
-                TreeType::Pine
+            Biome::Plains => {
+                // Plains biome - sparse mixed trees
+                match rng.gen_range(0..10) {
+                    0..=1 => TreeType::Pine,
+                    2..=5 => TreeType::Oak,
+                    _ => TreeType::Birch,
+                }
+            }
+            Biome::Swamp => {
+                // Swamp biome - mostly oak and birch
+                if rng.gen::<f32>() < 0.6 {
+                    TreeType::Oak
+                } else {
+                    TreeType::Birch
+                }
             }
         };
 
@@ -495,12 +510,7 @@ impl StructureGenerator {
     }
 
     /// Get the type of structure to place based on biome and randomness
-    pub fn get_structure_type(
-        &self,
-        world_x: i32,
-        world_z: i32,
-        _biome_value: f64,
-    ) -> StructureType {
+    pub fn get_structure_type(&self, world_x: i32, world_z: i32, biome: Biome) -> StructureType {
         // Create a deterministic RNG based on position
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         use std::hash::{Hash, Hasher};
@@ -512,11 +522,16 @@ impl StructureGenerator {
         let mut rng = StdRng::seed_from_u64(hash);
         let structure_roll = rng.gen::<f32>();
 
-        // Houses are rarer than trees
-        if structure_roll < 0.7 {
+        let config = biome.get_config();
+
+        // Use biome-specific structure spawn rates
+        if structure_roll < (config.tree_density * 100.0) as f32 {
             StructureType::Tree
-        } else {
+        } else if structure_roll < ((config.tree_density + config.house_chance) * 100.0) as f32 {
             StructureType::House
+        } else {
+            // No structure for this position
+            StructureType::Tree // Default fallback (should rarely happen with proper tuning)
         }
     }
 
@@ -526,7 +541,7 @@ impl StructureGenerator {
         chunk_x: i32,
         chunk_z: i32,
         terrain_height_map: &[[usize; CHUNK_SIZE]; CHUNK_SIZE],
-        biome_map: &[[f64; CHUNK_SIZE]; CHUNK_SIZE],
+        biome_map: &[[Biome; CHUNK_SIZE]; CHUNK_SIZE],
         terrain: &crate::terrain::Terrain,
     ) -> Vec<PlacedStructure> {
         let mut structures = Vec::new();
@@ -555,8 +570,8 @@ impl StructureGenerator {
                 let local_x = world_x - chunk_start_x;
                 let local_z = world_z - chunk_start_z;
 
-                // For positions outside the chunk, we need to calculate height and biome using noise
-                let (terrain_height, biome_value) = if local_x >= 0
+                // For positions outside the chunk, we need to calculate height and biome using terrain
+                let (terrain_height, biome) = if local_x >= 0
                     && local_x < CHUNK_SIZE as i32
                     && local_z >= 0
                     && local_z < CHUNK_SIZE as i32
@@ -568,8 +583,8 @@ impl StructureGenerator {
                     )
                 } else {
                     // Position is outside current chunk - query terrain for values
-                    let height = terrain.calculate_height_at(world_x, world_z);
-                    let biome = terrain.calculate_biome_at(world_x, world_z);
+                    let height = terrain.height_at(world_x, world_z);
+                    let biome = terrain.select_biome_at(world_x, world_z);
                     (height, biome)
                 };
 
@@ -582,11 +597,11 @@ impl StructureGenerator {
                 let hash = hasher.finish();
                 let mut rng = StdRng::seed_from_u64(hash);
 
-                let structure_type = self.get_structure_type(world_x, world_z, biome_value);
+                let structure_type = self.get_structure_type(world_x, world_z, biome);
 
                 let structure: Box<dyn Structure> = match structure_type {
                     StructureType::Tree => {
-                        Box::new(TreeStructure::random_for_biome(biome_value, &mut rng))
+                        Box::new(TreeStructure::random_for_biome(biome, &mut rng))
                     }
                     StructureType::House => Box::new(HouseStructure::random(&mut rng)),
                 };
@@ -616,7 +631,7 @@ impl StructureGenerator {
                                 terrain_height_map[check_local_x as usize][check_local_z as usize]
                                     as i32
                             } else {
-                                terrain.calculate_height_at(check_world_x, check_world_z) as i32
+                                terrain.height_at(check_world_x, check_world_z) as i32
                             };
 
                             height_variance =

@@ -5,6 +5,7 @@ use winit::{
     window::Window,
 };
 
+mod biome;
 mod blocks;
 mod camera;
 mod chunk;
@@ -19,6 +20,7 @@ mod voxel;
 mod wireframe;
 mod world;
 
+use biome::Biome;
 use camera::CameraSystem;
 use chunk_debug::ChunkDebugRenderer;
 use light::DirectionalLight;
@@ -54,6 +56,7 @@ struct State<'window> {
     window_focused: bool,
     selected_block: Option<RaycastHit>,
     debug_mode: bool,
+    current_biome: Option<Biome>,
 }
 
 impl<'window> State<'window> {
@@ -364,6 +367,7 @@ impl<'window> State<'window> {
             window_focused: true,
             selected_block: None,
             debug_mode: false,
+            current_biome: None,
         })
     }
 
@@ -499,6 +503,29 @@ impl<'window> State<'window> {
         let camera_pos = self.camera.get_position();
         self.world.update(camera_pos, &self.device);
 
+        // Check for biome changes
+        let world_x = camera_pos.x.floor() as i32;
+        let world_z = camera_pos.z.floor() as i32;
+        let biome_weights = self
+            .world
+            .get_terrain()
+            .get_biome_weights_at(world_x, world_z);
+        let current_biome = biome_weights.get_dominant_biome();
+
+        if self.current_biome != Some(current_biome) {
+            // Display detailed biome blend information
+            println!("Entered {} biome (dominant)", current_biome.name());
+            if biome_weights.weights.len() > 1 {
+                println!("  Biome blend:");
+                for (biome, weight) in &biome_weights.weights {
+                    if *weight > 0.01 {
+                        println!("    {}: {:.1}%", biome.name(), weight * 100.0);
+                    }
+                }
+            }
+            self.current_biome = Some(current_biome);
+        }
+
         // Update chunk debug renderer if debug mode is enabled
         if self.debug_mode {
             let chunk_positions = self.world.get_loaded_chunk_positions();
@@ -526,43 +553,8 @@ impl<'window> State<'window> {
         let camera_pos = self.camera.get_position();
         let camera_yaw = self.camera.get_yaw();
         let camera_pitch = self.camera.get_pitch();
-
         let ray = create_camera_ray(camera_pos, camera_yaw, camera_pitch);
         let new_selection = raycast_blocks(ray, 5.0, &self.world); // 5 block reach distance
-
-        // Debug: Print when selection changes
-        match (&self.selected_block, &new_selection) {
-            (None, Some(hit)) => {
-                // Verify this is actually a solid block
-                let is_solid =
-                    self.world
-                        .is_block_solid(hit.block_pos[0], hit.block_pos[1], hit.block_pos[2]);
-                println!(
-                    "Block selected at: {:?} (is_solid: {})",
-                    hit.block_pos, is_solid
-                );
-                if !is_solid {
-                    println!("WARNING: Selected block is not solid! This shouldn't happen.");
-                }
-            }
-            (Some(_), None) => {
-                println!("Block deselected");
-            }
-            (Some(old), Some(new)) if old.block_pos != new.block_pos => {
-                let is_solid =
-                    self.world
-                        .is_block_solid(new.block_pos[0], new.block_pos[1], new.block_pos[2]);
-                println!(
-                    "Block selection changed from {:?} to {:?} (is_solid: {})",
-                    old.block_pos, new.block_pos, is_solid
-                );
-                if !is_solid {
-                    println!("WARNING: Selected block is not solid! This shouldn't happen.");
-                }
-            }
-            _ => {} // No change
-        }
-
         self.selected_block = new_selection;
     }
 
@@ -687,7 +679,6 @@ impl<'window> State<'window> {
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -780,7 +771,6 @@ impl<'window> State<'window> {
                 static mut LAST_WIREFRAME_POS: Option<[i32; 3]> = None;
                 unsafe {
                     if LAST_WIREFRAME_POS != Some(hit.block_pos) {
-                        println!("Rendering wireframe at: {:?}", hit.block_pos);
                         LAST_WIREFRAME_POS = Some(hit.block_pos);
                     }
                 }
@@ -823,7 +813,7 @@ fn main() -> anyhow::Result<()> {
     let event_loop = EventLoop::new()?;
     let window = winit::window::WindowBuilder::new()
         .with_title("Voxel Game")
-        .with_inner_size(winit::dpi::LogicalSize::new(800, 600))
+        .with_inner_size(winit::dpi::LogicalSize::new(1280, 800))
         .build(&event_loop)?;
 
     // Properly confine the cursor for FPS-style camera movement

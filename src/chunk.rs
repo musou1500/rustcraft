@@ -1,3 +1,4 @@
+use crate::biome::Biome;
 use crate::blocks::{get_block_registry, BlockType};
 use crate::structures::{PlacedStructure, StructureGenerator};
 use crate::terrain::Terrain;
@@ -48,18 +49,18 @@ impl ChunkGenerator {
     ) -> (ChunkData, ChunkBlocks) {
         // Generate height and biome maps for structure generation
         let mut height_values = [[0usize; CHUNK_SIZE]; CHUNK_SIZE];
-        let mut biome_values = [[0.0f64; CHUNK_SIZE]; CHUNK_SIZE];
+        let mut biome_map = [[Biome::Plains; CHUNK_SIZE]; CHUNK_SIZE];
 
         for x in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
                 let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
                 let world_z = chunk_pos.z * CHUNK_SIZE as i32 + z as i32;
 
-                let height = terrain.calculate_height_at(world_x, world_z);
-                let biome_noise_val = terrain.calculate_biome_at(world_x, world_z);
+                let height = terrain.height_at(world_x, world_z);
+                let biome = terrain.select_biome_at(world_x, world_z);
 
                 height_values[x][z] = height;
-                biome_values[x][z] = biome_noise_val;
+                biome_map[x][z] = biome;
             }
         }
 
@@ -68,7 +69,7 @@ impl ChunkGenerator {
             chunk_pos.x,
             chunk_pos.z,
             &height_values,
-            &biome_values,
+            &biome_map,
             terrain,
         );
 
@@ -91,32 +92,32 @@ impl ChunkGenerator {
 
         // Pre-compute noise values for the entire chunk in batches
         let mut height_values = vec![vec![0usize; CHUNK_SIZE]; CHUNK_SIZE];
-        let mut biome_values = vec![vec![0.0f64; CHUNK_SIZE]; CHUNK_SIZE];
+        let mut biome_map = vec![vec![Biome::Plains; CHUNK_SIZE]; CHUNK_SIZE];
 
-        // Compute height and biome noise in parallel using centralized methods
-        let noise_data: Vec<(usize, usize, usize, f64)> = (0..CHUNK_SIZE)
+        // Compute height and biome data in parallel
+        let terrain_data: Vec<(usize, usize, usize, Biome)> = (0..CHUNK_SIZE)
             .into_par_iter()
             .flat_map(|x| {
                 (0..CHUNK_SIZE).into_par_iter().map(move |z| {
                     let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
                     let world_z = chunk_pos.z * CHUNK_SIZE as i32 + z as i32;
 
-                    let height = terrain.calculate_height_at(world_x, world_z);
-                    let biome_noise_val = terrain.calculate_biome_at(world_x, world_z);
+                    let height = terrain.height_at(world_x, world_z);
+                    let biome = terrain.select_biome_at(world_x, world_z);
 
-                    (x, z, height, biome_noise_val)
+                    (x, z, height, biome)
                 })
             })
             .collect();
 
         // Store the computed values
-        for (x, z, height, biome_noise_val) in noise_data {
+        for (x, z, height, biome) in terrain_data {
             height_values[x][z] = height;
-            biome_values[x][z] = biome_noise_val;
+            biome_map[x][z] = biome;
         }
 
-        // Generate terrain blocks using pre-computed noise
-        chunk_blocks = terrain.generate_terrain_blocks(chunk_pos, &height_values, &biome_values);
+        // Generate terrain blocks using pre-computed biome data
+        chunk_blocks = terrain.generate_terrain_blocks(chunk_pos, &height_values, &biome_map);
 
         // Place structure blocks into the chunk
         for structure in structures {
