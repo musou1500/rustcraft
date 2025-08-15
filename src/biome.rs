@@ -45,88 +45,6 @@ pub struct BiomeConfig {
     pub house_chance: f64,
 }
 
-/// Represents blended biome weights for smooth transitions
-#[derive(Debug, Clone)]
-pub struct BiomeWeights {
-    pub weights: HashMap<Biome, f64>,
-}
-
-impl BiomeWeights {
-    pub fn new() -> Self {
-        Self {
-            weights: HashMap::new(),
-        }
-    }
-
-    pub fn add_weight(&mut self, biome: Biome, weight: f64) {
-        self.weights.insert(biome, weight);
-    }
-
-    /// Get the dominant biome (highest weight)
-    pub fn get_dominant_biome(&self) -> Biome {
-        self.weights
-            .iter()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-            .map(|(biome, _)| *biome)
-            .unwrap_or(Biome::Plains)
-    }
-
-    /// Get blended biome configuration by averaging configs weighted by their influence
-    pub fn get_blended_config(&self) -> BiomeConfig {
-        if self.weights.is_empty() {
-            return Biome::Plains.get_config();
-        }
-
-        let total_weight: f64 = self.weights.values().sum();
-        if total_weight == 0.0 {
-            return Biome::Plains.get_config();
-        }
-
-        let mut blended_config = BiomeConfig {
-            base_height: 0,
-            frequency: 0.0,
-            amplitude: 0.0,
-            surface_block: BlockType::Grass, // Will be determined by dominant biome
-            subsurface_block: BlockType::Dirt, // Will be determined by dominant biome
-            stone_block: BlockType::Stone,
-            temperature: 0.0,
-            humidity: 0.0,
-            tree_density: 0.0,
-            house_chance: 0.0,
-        };
-
-        // Calculate weighted averages for numerical properties
-        let mut base_height_sum = 0.0;
-        for (biome, weight) in &self.weights {
-            let config = biome.get_config();
-            let normalized_weight = weight / total_weight;
-
-            base_height_sum += config.base_height as f64 * normalized_weight;
-            blended_config.frequency += config.frequency * normalized_weight;
-            blended_config.amplitude += config.amplitude * normalized_weight;
-            blended_config.temperature += config.temperature * normalized_weight;
-            blended_config.humidity += config.humidity * normalized_weight;
-            blended_config.tree_density += config.tree_density * normalized_weight;
-            blended_config.house_chance += config.house_chance * normalized_weight;
-        }
-
-        blended_config.base_height = base_height_sum.round() as usize;
-
-        // Use dominant biome's block types (for now)
-        let dominant_config = self.get_dominant_biome().get_config();
-        blended_config.surface_block = dominant_config.surface_block;
-        blended_config.subsurface_block = dominant_config.subsurface_block;
-
-        blended_config
-    }
-}
-
-/// Helper function for smooth interpolation
-fn smooth_step(edge0: f64, edge1: f64, x: f64) -> f64 {
-    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
-}
-
 /// Selects biomes based on environmental factors
 pub struct BiomeSelector {
     temperature_noise: Perlin,
@@ -170,98 +88,89 @@ impl BiomeSelector {
         }
     }
 
-    /// Get biome weights for smooth transitions around a position
-    pub fn get_biome_weights(&self, world_x: i32, world_z: i32) -> BiomeWeights {
-        let temp = self
-            .temperature_noise
-            .get([world_x as f64 * 0.003, world_z as f64 * 0.003]);
-        let humidity = self
-            .humidity_noise
-            .get([world_x as f64 * 0.004, world_z as f64 * 0.004]);
+    /// Get blended biome configuration using distance-based blending
+    pub fn get_blended_config(&self, world_x: i32, world_z: i32) -> BiomeConfig {
+        // Sample biomes at nearby positions for distance-based blending
+        let sample_radius = 8.0; // blocks
+        let sample_points = [
+            (0.0, 0.0), // center
+            (sample_radius, 0.0),
+            (-sample_radius, 0.0),
+            (0.0, sample_radius),
+            (0.0, -sample_radius),
+            (sample_radius * 0.7, sample_radius * 0.7),
+            (-sample_radius * 0.7, sample_radius * 0.7),
+            (sample_radius * 0.7, -sample_radius * 0.7),
+            (-sample_radius * 0.7, -sample_radius * 0.7),
+        ];
 
-        let mut weights = BiomeWeights::new();
+        let mut biome_weights = HashMap::new();
 
-        // Define transition width for smooth boundaries
-        let transition_width = 0.1;
+        // Sample biomes and calculate distance-based weights
+        for (dx, dz) in sample_points.iter() {
+            let sample_x = world_x as f64 + dx;
+            let sample_z = world_z as f64 + dz;
+            let biome = self.select_biome(sample_x as i32, sample_z as i32);
 
-        // Calculate weights for each biome based on distance from thresholds
+            // Distance from center position
+            let distance = (dx * dx + dz * dz).sqrt();
+            // Use inverse distance weighting (closer = more influence)
+            let weight = 1.0 / (1.0 + distance / sample_radius);
 
-        // Tundra: Very cold and not humid
-        let tundra_temp_weight = if temp < -0.4 + transition_width {
-            1.0 - smooth_step(-0.4 - transition_width, -0.4 + transition_width, temp)
-        } else {
-            0.0
-        };
-        let tundra_humidity_weight = if humidity < 0.0 + transition_width {
-            1.0 - smooth_step(0.0 - transition_width, 0.0 + transition_width, humidity)
-        } else {
-            0.0
-        };
-        let tundra_weight = tundra_temp_weight * tundra_humidity_weight;
-        if tundra_weight > 0.01 {
-            weights.add_weight(Biome::Tundra, tundra_weight);
+            *biome_weights.entry(biome).or_insert(0.0) += weight;
         }
 
-        // Mountain: Cold
-        let mountain_weight = if temp < -0.2 + transition_width {
-            1.0 - smooth_step(-0.2 - transition_width, -0.2 + transition_width, temp)
-        } else {
-            0.0
+        // Normalize weights
+        let total_weight: f64 = biome_weights.values().sum();
+        if total_weight == 0.0 {
+            return Biome::Plains.get_config();
+        }
+
+        // Blend configurations based on weights
+        let mut blended_config = BiomeConfig {
+            base_height: 0,
+            frequency: 0.0,
+            amplitude: 0.0,
+            surface_block: BlockType::Grass,
+            subsurface_block: BlockType::Dirt,
+            stone_block: BlockType::Stone,
+            temperature: 0.0,
+            humidity: 0.0,
+            tree_density: 0.0,
+            house_chance: 0.0,
         };
-        if mountain_weight > 0.01 {
-            weights.add_weight(Biome::Mountain, mountain_weight);
+
+        let mut base_height_sum = 0.0;
+        let mut dominant_biome = Biome::Plains;
+        let mut max_weight = 0.0;
+
+        for (biome, weight) in &biome_weights {
+            let config = biome.get_config();
+            let normalized_weight = weight / total_weight;
+
+            base_height_sum += config.base_height as f64 * normalized_weight;
+            blended_config.frequency += config.frequency * normalized_weight;
+            blended_config.amplitude += config.amplitude * normalized_weight;
+            blended_config.temperature += config.temperature * normalized_weight;
+            blended_config.humidity += config.humidity * normalized_weight;
+            blended_config.tree_density += config.tree_density * normalized_weight;
+            blended_config.house_chance += config.house_chance * normalized_weight;
+
+            // Track dominant biome for block types
+            if *weight > max_weight {
+                max_weight = *weight;
+                dominant_biome = *biome;
+            }
         }
 
-        // Desert: Hot and dry
-        let desert_temp_weight = if temp > 0.3 - transition_width {
-            smooth_step(0.3 - transition_width, 0.3 + transition_width, temp)
-        } else {
-            0.0
-        };
-        let desert_humidity_weight = if humidity < -0.2 + transition_width {
-            1.0 - smooth_step(-0.2 - transition_width, -0.2 + transition_width, humidity)
-        } else {
-            0.0
-        };
-        let desert_weight = desert_temp_weight * desert_humidity_weight;
-        if desert_weight > 0.01 {
-            weights.add_weight(Biome::Desert, desert_weight);
-        }
+        blended_config.base_height = base_height_sum.round() as usize;
 
-        // Swamp: Very humid
-        let swamp_weight = if humidity > 0.4 - transition_width {
-            smooth_step(0.4 - transition_width, 0.4 + transition_width, humidity)
-        } else {
-            0.0
-        };
-        if swamp_weight > 0.01 {
-            weights.add_weight(Biome::Swamp, swamp_weight);
-        }
+        // Use dominant biome's block types
+        let dominant_config = dominant_biome.get_config();
+        blended_config.surface_block = dominant_config.surface_block;
+        blended_config.subsurface_block = dominant_config.subsurface_block;
 
-        // Forest: Temperate warm
-        let forest_weight = if temp > 0.1 - transition_width && temp < 0.3 + transition_width {
-            smooth_step(0.1 - transition_width, 0.1 + transition_width, temp)
-                * (1.0 - smooth_step(0.3 - transition_width, 0.3 + transition_width, temp))
-        } else {
-            0.0
-        };
-        if forest_weight > 0.01 {
-            weights.add_weight(Biome::Forest, forest_weight);
-        }
-
-        // Plains: Default for areas not covered by other biomes
-        let other_weights_sum: f64 = weights.weights.values().sum();
-        let plains_weight = (1.0 - other_weights_sum).max(0.0);
-        if plains_weight > 0.01 {
-            weights.add_weight(Biome::Plains, plains_weight);
-        }
-
-        // Ensure we have at least one biome
-        if weights.weights.is_empty() {
-            weights.add_weight(Biome::Plains, 1.0);
-        }
-
-        weights
+        blended_config
     }
 }
 

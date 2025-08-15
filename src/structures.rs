@@ -584,7 +584,7 @@ impl StructureGenerator {
                 } else {
                     // Position is outside current chunk - query terrain for values
                     let height = terrain.height_at(world_x, world_z);
-                    let biome = terrain.select_biome_at(world_x, world_z);
+                    let biome = terrain.biome_at(world_x, world_z);
                     (height, biome)
                 };
 

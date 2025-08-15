@@ -12,9 +12,6 @@ pub enum BlockType {
     Water,
     Wood,
     Leaves,
-    Coal,
-    Iron,
-    Gold,
     Snow,
     Planks,
     Cobblestone,
@@ -33,14 +30,11 @@ pub enum TextureId {
     WoodTop = 6,
     WoodSide = 7,
     Leaves = 8,
-    Coal = 9,
-    Iron = 10,
-    Gold = 11,
-    Snow = 12,
-    Bedrock = 13,
-    Planks = 14,
-    Cobblestone = 15,
-    Glass = 16,
+    Snow = 9,
+    Bedrock = 10,
+    Planks = 11,
+    Cobblestone = 12,
+    Glass = 13,
 }
 
 /// Material properties for a block type
@@ -216,44 +210,6 @@ impl BlockRegistry {
             },
         );
 
-        // Coal - dark gray/black
-        self.register(
-            BlockType::Coal,
-            BlockMaterial {
-                name: "Coal",
-                textures: FaceTextures::all_same(TextureId::Coal as u32),
-                hardness: 2.5,
-                is_solid: true,
-                is_transparent: false,
-                emission: 0.0,
-            },
-        );
-
-        // Iron - metallic gray
-        self.register(
-            BlockType::Iron,
-            BlockMaterial {
-                name: "Iron",
-                textures: FaceTextures::all_same(TextureId::Iron as u32),
-                hardness: 4.0,
-                is_solid: true,
-                is_transparent: false,
-                emission: 0.0,
-            },
-        );
-
-        // Gold - golden yellow
-        self.register(
-            BlockType::Gold,
-            BlockMaterial {
-                name: "Gold",
-                textures: FaceTextures::all_same(TextureId::Gold as u32),
-                hardness: 3.5,
-                is_solid: true,
-                is_transparent: false,
-                emission: 0.1, // Slight glow
-            },
-        );
 
         // Snow - white, soft
         self.register(

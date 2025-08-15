@@ -506,23 +506,10 @@ impl<'window> State<'window> {
         // Check for biome changes
         let world_x = camera_pos.x.floor() as i32;
         let world_z = camera_pos.z.floor() as i32;
-        let biome_weights = self
-            .world
-            .get_terrain()
-            .get_biome_weights_at(world_x, world_z);
-        let current_biome = biome_weights.get_dominant_biome();
+        let current_biome = self.world.get_terrain().biome_at(world_x, world_z);
 
         if self.current_biome != Some(current_biome) {
-            // Display detailed biome blend information
-            println!("Entered {} biome (dominant)", current_biome.name());
-            if biome_weights.weights.len() > 1 {
-                println!("  Biome blend:");
-                for (biome, weight) in &biome_weights.weights {
-                    if *weight > 0.01 {
-                        println!("    {}: {:.1}%", biome.name(), weight * 100.0);
-                    }
-                }
-            }
+            println!("Entered {} biome", current_biome.name());
             self.current_biome = Some(current_biome);
         }
 

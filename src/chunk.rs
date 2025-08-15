@@ -57,7 +57,7 @@ impl ChunkGenerator {
                 let world_z = chunk_pos.z * CHUNK_SIZE as i32 + z as i32;
 
                 let height = terrain.height_at(world_x, world_z);
-                let biome = terrain.select_biome_at(world_x, world_z);
+                let biome = terrain.biome_at(world_x, world_z);
 
                 height_values[x][z] = height;
                 biome_map[x][z] = biome;
@@ -103,7 +103,7 @@ impl ChunkGenerator {
                     let world_z = chunk_pos.z * CHUNK_SIZE as i32 + z as i32;
 
                     let height = terrain.height_at(world_x, world_z);
-                    let biome = terrain.select_biome_at(world_x, world_z);
+                    let biome = terrain.biome_at(world_x, world_z);
 
                     (x, z, height, biome)
                 })

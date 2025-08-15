@@ -1,29 +1,21 @@
-use crate::biome::{Biome, BiomeSelector, BiomeWeights};
+use crate::biome::{Biome, BiomeSelector};
 use crate::blocks::BlockType;
 use crate::chunk::{ChunkBlocks, ChunkPos, CHUNK_SIZE, TERRAIN_MAX_HEIGHT, WORLD_HEIGHT};
 use noise::{NoiseFn, Perlin};
 
-const BASE_HEIGHT: usize = 8; // Minimum terrain height
-
 /// Terrain generation with biome-aware shaping and block selection
 pub struct Terrain {
     height_noise: Perlin,
-    ore_noise: Perlin,
-    texture_noise: Perlin,
     biome_selector: BiomeSelector,
 }
 
 impl Terrain {
     pub fn new(seed: u32) -> Self {
         let height_noise = Perlin::new(seed);
-        let ore_noise = Perlin::new(seed.wrapping_add(9999));
-        let texture_noise = Perlin::new(seed.wrapping_add(5555));
         let biome_selector = BiomeSelector::new(seed);
 
         Self {
             height_noise,
-            ore_noise,
-            texture_noise,
             biome_selector,
         }
     }
@@ -52,9 +44,6 @@ impl Terrain {
                         // Use new biome-aware block selection
                         chunk_blocks[x][z][y] =
                             self.get_block_for_position(world_x, y, world_z, height, biome);
-                    } else {
-                        // Above natural terrain height - default to air
-                        chunk_blocks[x][z][y] = BlockType::Air;
                     }
                 }
             }
@@ -65,8 +54,7 @@ impl Terrain {
 
     /// Calculate terrain height at any world position using octave-based noise
     pub fn height_at(&self, world_x: i32, world_z: i32) -> usize {
-        let biome_weights = self.biome_selector.get_biome_weights(world_x, world_z);
-        let config = biome_weights.get_blended_config();
+        let config = self.biome_selector.get_blended_config(world_x, world_z);
 
         let world_x = world_x as f64;
         let world_z = world_z as f64;
@@ -94,21 +82,16 @@ impl Terrain {
     }
 
     /// Select biome at any world position
-    pub fn select_biome_at(&self, world_x: i32, world_z: i32) -> Biome {
+    pub fn biome_at(&self, world_x: i32, world_z: i32) -> Biome {
         self.biome_selector.select_biome(world_x, world_z)
-    }
-
-    /// Get biome weights for smooth transitions at any world position
-    pub fn get_biome_weights_at(&self, world_x: i32, world_z: i32) -> BiomeWeights {
-        self.biome_selector.get_biome_weights(world_x, world_z)
     }
 
     /// Get block type for a specific position using biome configuration
     pub fn get_block_for_position(
         &self,
-        world_x: i32,
+        _world_x: i32,
         y: usize,
-        world_z: i32,
+        _world_z: i32,
         height: usize,
         biome: Biome,
     ) -> BlockType {
@@ -126,20 +109,7 @@ impl Terrain {
         } else if y >= height.saturating_sub(4) {
             config.subsurface_block
         } else {
-            // Ore generation in stone layer
-            let ore_noise =
-                self.ore_noise
-                    .get([world_x as f64 * 0.2, y as f64 * 0.3, world_z as f64 * 0.2]);
-
-            if ore_noise > 0.95 {
-                BlockType::Gold
-            } else if ore_noise > 0.9 {
-                BlockType::Iron
-            } else if ore_noise > 0.8 {
-                BlockType::Coal
-            } else {
-                config.stone_block
-            }
+            config.stone_block
         }
     }
 }

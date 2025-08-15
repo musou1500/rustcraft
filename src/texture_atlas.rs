@@ -130,10 +130,11 @@ fn generate_texture(
                 6 => generate_wood_top_texture(x, y, size),   // Wood Top
                 7 => generate_wood_side_texture(x, y, size),  // Wood Side
                 8 => generate_leaves_texture(x, y, size),     // Leaves
-                9 => generate_coal_texture(x, y, size),       // Coal
-                10 => generate_iron_texture(x, y, size),      // Iron
-                11 => generate_gold_texture(x, y, size),      // Gold
-                12 => generate_snow_texture(x, y, size),      // Snow
+                9 => generate_snow_texture(x, y, size),       // Snow
+                10 => generate_bedrock_texture(x, y, size),   // Bedrock
+                11 => generate_planks_texture(x, y, size),    // Planks
+                12 => generate_cobblestone_texture(x, y, size), // Cobblestone
+                13 => generate_glass_texture(x, y, size),     // Glass
                 _ => (128, 128, 128),                         // Default gray
             };
 
@@ -237,30 +238,39 @@ fn generate_leaves_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
     (r, g, b)
 }
 
-fn generate_coal_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 17 + y * 23) % 31) as f32 / 31.0;
-    let brightness = (20.0 + noise * 40.0) as u8;
-    (brightness, brightness, brightness.saturating_add(10))
-}
-
-fn generate_iron_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 6 + y * 8) % 15) as f32 / 15.0;
-    let r = (160.0 + noise * 50.0) as u8;
-    let g = (160.0 + noise * 50.0) as u8;
-    let b = (170.0 + noise * 55.0) as u8;
-    (r, g, b)
-}
-
-fn generate_gold_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 4 + y * 6) % 11) as f32 / 11.0;
-    let r = (240.0 + noise * 15.0) as u8;
-    let g = (200.0 + noise * 35.0) as u8;
-    let b = (20.0 + noise * 30.0) as u8;
-    (r, g, b)
-}
 
 fn generate_snow_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
     let noise = ((x * 2 + y * 3) % 7) as f32 / 7.0;
     let brightness = (235.0 + noise * 20.0) as u8;
     (brightness, brightness, brightness.saturating_add(5))
+}
+
+fn generate_bedrock_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
+    let noise = ((x * 13 + y * 7) % 17) as f32 / 17.0;
+    let brightness = (10.0 + noise * 25.0) as u8;
+    (brightness, brightness, brightness.saturating_add(5))
+}
+
+fn generate_planks_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
+    let wood_grain = if y % 4 < 2 { 1.0 } else { 0.8 };
+    let noise = ((x * 5 + y * 7) % 13) as f32 / 13.0;
+    let r = (140.0 * wood_grain + noise * 20.0) as u8;
+    let g = (100.0 * wood_grain + noise * 15.0) as u8;
+    let b = (60.0 * wood_grain + noise * 10.0) as u8;
+    (r, g, b)
+}
+
+fn generate_cobblestone_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
+    let stone_pattern = ((x / 4 + y / 4) % 2) as f32 * 0.1 + 0.9;
+    let noise = ((x * 7 + y * 11) % 19) as f32 / 19.0;
+    let brightness = (90.0 * stone_pattern + noise * 40.0) as u8;
+    (brightness, brightness, brightness.saturating_add(10))
+}
+
+fn generate_glass_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
+    let noise = ((x * 3 + y * 5) % 11) as f32 / 11.0;
+    let r = (200.0 + noise * 20.0) as u8;
+    let g = (220.0 + noise * 15.0) as u8;
+    let b = (240.0 + noise * 15.0) as u8;
+    (r, g, b)
 }
