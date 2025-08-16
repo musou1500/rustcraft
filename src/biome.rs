@@ -1,6 +1,6 @@
 use crate::blocks::BlockType;
 use noise::{NoiseFn, Perlin};
-use std::collections::HashMap;
+use rayon::vec;
 
 /// Explicit biome types with unique characteristics
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -87,91 +87,6 @@ impl BiomeSelector {
             _ => Biome::Plains,
         }
     }
-
-    /// Get blended biome configuration using distance-based blending
-    pub fn get_blended_config(&self, world_x: i32, world_z: i32) -> BiomeConfig {
-        // Sample biomes at nearby positions for distance-based blending
-        let sample_radius = 8.0; // blocks
-        let sample_points = [
-            (0.0, 0.0), // center
-            (sample_radius, 0.0),
-            (-sample_radius, 0.0),
-            (0.0, sample_radius),
-            (0.0, -sample_radius),
-            (sample_radius * 0.7, sample_radius * 0.7),
-            (-sample_radius * 0.7, sample_radius * 0.7),
-            (sample_radius * 0.7, -sample_radius * 0.7),
-            (-sample_radius * 0.7, -sample_radius * 0.7),
-        ];
-
-        let mut biome_weights = HashMap::new();
-
-        // Sample biomes and calculate distance-based weights
-        for (dx, dz) in sample_points.iter() {
-            let sample_x = world_x as f64 + dx;
-            let sample_z = world_z as f64 + dz;
-            let biome = self.select_biome(sample_x as i32, sample_z as i32);
-
-            // Distance from center position
-            let distance = (dx * dx + dz * dz).sqrt();
-            // Use inverse distance weighting (closer = more influence)
-            let weight = 1.0 / (1.0 + distance / sample_radius);
-
-            *biome_weights.entry(biome).or_insert(0.0) += weight;
-        }
-
-        // Normalize weights
-        let total_weight: f64 = biome_weights.values().sum();
-        if total_weight == 0.0 {
-            return Biome::Plains.get_config();
-        }
-
-        // Blend configurations based on weights
-        let mut blended_config = BiomeConfig {
-            base_height: 0,
-            frequency: 0.0,
-            amplitude: 0.0,
-            surface_block: BlockType::Grass,
-            subsurface_block: BlockType::Dirt,
-            stone_block: BlockType::Stone,
-            temperature: 0.0,
-            humidity: 0.0,
-            tree_density: 0.0,
-            house_chance: 0.0,
-        };
-
-        let mut base_height_sum = 0.0;
-        let mut dominant_biome = Biome::Plains;
-        let mut max_weight = 0.0;
-
-        for (biome, weight) in &biome_weights {
-            let config = biome.get_config();
-            let normalized_weight = weight / total_weight;
-
-            base_height_sum += config.base_height as f64 * normalized_weight;
-            blended_config.frequency += config.frequency * normalized_weight;
-            blended_config.amplitude += config.amplitude * normalized_weight;
-            blended_config.temperature += config.temperature * normalized_weight;
-            blended_config.humidity += config.humidity * normalized_weight;
-            blended_config.tree_density += config.tree_density * normalized_weight;
-            blended_config.house_chance += config.house_chance * normalized_weight;
-
-            // Track dominant biome for block types
-            if *weight > max_weight {
-                max_weight = *weight;
-                dominant_biome = *biome;
-            }
-        }
-
-        blended_config.base_height = base_height_sum.round() as usize;
-
-        // Use dominant biome's block types
-        let dominant_config = dominant_biome.get_config();
-        blended_config.surface_block = dominant_config.surface_block;
-        blended_config.subsurface_block = dominant_config.subsurface_block;
-
-        blended_config
-    }
 }
 
 impl Biome {
@@ -179,7 +94,7 @@ impl Biome {
     pub fn get_config(&self) -> BiomeConfig {
         match self {
             Biome::Mountain => BiomeConfig {
-                base_height: 18,
+                base_height: 8,
                 frequency: 0.02, // Medium detail for mountain ridges
                 amplitude: 6.0,  // Higher amplitude for dramatic mountain peaks
                 surface_block: BlockType::Stone,

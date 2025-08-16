@@ -52,10 +52,42 @@ impl Terrain {
         chunk_blocks
     }
 
-    /// Calculate terrain height at any world position using octave-based noise
+    /// Calculate terrain height at any world position using IWD-blended heights from nearby biomes
     pub fn height_at(&self, world_x: i32, world_z: i32) -> usize {
-        let config = self.biome_selector.get_blended_config(world_x, world_z);
+        let current_biome = self.biome_selector.select_biome(world_x, world_z);
+        let current_height = self.calculate_height_for_biome(world_x, world_z, current_biome);
 
+        // Find nearby biome boundaries
+        let biome_boundaries = self.find_biome_boundaries(world_x, world_z);
+
+        // If no boundaries found, return current biome height
+        if biome_boundaries.is_empty() {
+            return current_height;
+        }
+
+        // Calculate heights at boundaries and apply IWD blending
+        let mut height_sum = 0.0; // Current position has distance ~0
+        let mut weight_sum = 0.0;
+
+        for (boundary_x, boundary_y, boundary_biome) in biome_boundaries {
+            let boundary_height =
+                self.calculate_height_for_biome(boundary_x, boundary_y, boundary_biome);
+            let distance =
+                (((world_x - boundary_x).pow(2) + (world_z - boundary_y).pow(2)) as f64).sqrt();
+            let weight = 1.0 / distance;
+            height_sum += (boundary_height as f64 - current_height as f64) * weight;
+            weight_sum += weight;
+        }
+
+        let blended_height = (height_sum / weight_sum).round() as usize;
+        TERRAIN_MAX_HEIGHT
+            .min(current_height + blended_height)
+            .max(1)
+    }
+
+    /// Calculate height for a specific biome using octave-based noise
+    fn calculate_height_for_biome(&self, world_x: i32, world_z: i32, biome: Biome) -> usize {
+        let config = biome.get_config();
         let world_x = world_x as f64;
         let world_z = world_z as f64;
 
@@ -78,7 +110,37 @@ impl Terrain {
             frequency *= lacunarity;
         }
 
-        TERRAIN_MAX_HEIGHT.min(noise_value.floor() as usize + config.base_height)
+        noise_value.floor() as usize + config.base_height
+    }
+
+    /// Find nearby biome boundaries by searching in cardinal directions
+    fn find_biome_boundaries(&self, world_x: i32, world_z: i32) -> Vec<(i32, i32, Biome)> {
+        let max_distance = 32; // Maximum distance to search for boundaries
+        let start_biome = self.biome_selector.select_biome(world_x, world_z);
+
+        let search_directions = [
+            (1, 0),  // +X axis
+            (-1, 0), // -X axis
+            (0, 1),  // +Z axis
+            (0, -1), // -Z axis
+        ];
+        let mut boundaries = vec![];
+
+        for (dx, dz) in &search_directions {
+            for distance in 1..=max_distance {
+                let neighbor_biome = self
+                    .biome_selector
+                    .select_biome(world_x + dx * distance, world_z + dz * distance);
+                if neighbor_biome != start_biome {
+                    boundaries.push((
+                        world_x + dx * distance,
+                        world_z + dz * distance,
+                        neighbor_biome,
+                    ));
+                }
+            }
+        }
+        boundaries
     }
 
     /// Select biome at any world position
