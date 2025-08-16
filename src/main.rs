@@ -46,7 +46,7 @@ struct State<'window> {
     chunk_debug_renderer: ChunkDebugRenderer,
     slot_ui: SlotUI,
     window: &'window Window,
-    cursor_locked: bool,
+    game_mode: bool,
     window_focused: bool,
     selected_block: Option<RaycastHit>,
     debug_mode: bool,
@@ -118,7 +118,6 @@ impl<'window> State<'window> {
         let world = World::new();
         let light = DirectionalLight::new(&device);
 
-
         // Create texture atlas bind group layout
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -151,7 +150,6 @@ impl<'window> State<'window> {
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
-
         // Main render pipeline layout
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -163,7 +161,6 @@ impl<'window> State<'window> {
                 ],
                 push_constant_ranges: &[],
             });
-
 
         let wireframe_renderer =
             WireframeRenderer::new(&device, surface_format, &camera.bind_group_layout);
@@ -234,7 +231,7 @@ impl<'window> State<'window> {
             chunk_debug_renderer,
             slot_ui,
             window,
-            cursor_locked: true,
+            game_mode: true,
             window_focused: true,
             selected_block: None,
             debug_mode: false,
@@ -339,47 +336,53 @@ impl<'window> State<'window> {
             }
         }
 
-        // If not a slot key, pass to camera
+        // Handle mouse clicks for game mode resumption
+        if let WindowEvent::MouseInput {
+            state: ElementState::Pressed,
+            button: MouseButton::Left,
+            ..
+        } = event
+        {
+            // If in menu mode and window is focused, resume game
+            if !self.game_mode && self.window_focused {
+                self.game_mode = true;
+                self.update_cursor_state();
+                println!("🎮 Game resumed!");
+                return true;
+            }
+        }
+
+        // If not a slot key or resume click, pass to camera
         self.camera.process_window_events(event)
     }
 
     fn input_device(&mut self, event: &DeviceEvent) -> bool {
-        // Only process mouse movement when cursor is locked and window is focused
-        if self.cursor_locked && self.window_focused {
+        // Only process mouse movement when in game mode and window is focused
+        if self.game_mode && self.window_focused {
             self.camera.process_device_events(event)
         } else {
             false
         }
     }
 
-    fn toggle_cursor_lock(&mut self) {
-        self.cursor_locked = !self.cursor_locked;
+    fn toggle_game_mode(&mut self) {
+        self.game_mode = !self.game_mode;
         self.update_cursor_state();
     }
 
     fn update_cursor_state(&mut self) {
-        if self.cursor_locked && self.window_focused {
+        if self.game_mode && self.window_focused {
             // Game mode: confine cursor to window and hide it
             let _ = self
                 .window
                 .set_cursor_grab(winit::window::CursorGrabMode::Confined);
             self.window.set_cursor_visible(false);
         } else {
-            // Desktop mode: free cursor and show it
+            // Menu mode: free cursor and show it
             let _ = self
                 .window
                 .set_cursor_grab(winit::window::CursorGrabMode::None);
             self.window.set_cursor_visible(true);
-
-            // Center cursor when switching to desktop mode
-            if !self.cursor_locked {
-                let window_size = self.window.inner_size();
-                let center_x = window_size.width as f64 / 2.0;
-                let center_y = window_size.height as f64 / 2.0;
-                let _ = self
-                    .window
-                    .set_cursor_position(winit::dpi::PhysicalPosition::new(center_x, center_y));
-            }
         }
     }
 
@@ -409,8 +412,8 @@ impl<'window> State<'window> {
                 .update_chunks(&self.device, &chunk_positions);
         }
 
-        // Update block selection (only when cursor is locked and window focused)
-        if self.cursor_locked && self.window_focused {
+        // Update block selection (only when in game mode and window focused)
+        if self.game_mode && self.window_focused {
             self.update_block_selection();
 
             // Check for block interaction (place or break)
@@ -582,7 +585,6 @@ impl<'window> State<'window> {
                 label: Some("Render Encoder"),
             });
 
-
         // Main render pass
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -684,7 +686,7 @@ fn main() -> anyhow::Result<()> {
     let mut last_render_time = std::time::Instant::now();
 
     println!("🌍 Use WASD to move, mouse to look around, Space to jump, Ctrl to run");
-    println!("🖱️  Press ESC to toggle cursor lock/unlock (currently locked)");
+    println!("🖱️  Press ESC to pause/resume game, ESC again in pause mode to exit");
     println!("🔨 Left click to break blocks (bright red outline shows selected block)");
     println!("📦 Right click to put selected block into current inventory slot");
     println!("🎒 Use number keys 1-0 to select inventory slots (1=leftmost, 0=rightmost)");
@@ -710,14 +712,23 @@ fn main() -> anyhow::Result<()> {
                                 },
                             ..
                         } => {
-                            if state.cursor_locked {
-                                state.toggle_cursor_lock();
+                            if state.game_mode {
+                                // In game mode: pause game (enter menu mode)
+                                state.game_mode = false;
+                                state.update_cursor_state();
+                                println!("🎮 Game paused. Click on window to resume or press ESC again to exit.");
                             } else {
+                                // In menu mode: exit game
                                 elwt.exit();
                             }
                         }
                         WindowEvent::Focused(focused) => {
                             state.window_focused = *focused;
+                            // Auto-pause when window loses focus
+                            if !focused && state.game_mode {
+                                state.game_mode = false;
+                                println!("🎮 Game auto-paused (window unfocused). Click to resume.");
+                            }
                             state.update_cursor_state();
                         }
                         WindowEvent::Resized(physical_size) => {
