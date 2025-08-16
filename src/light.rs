@@ -9,7 +9,6 @@ pub struct LightUniform {
     pub _padding: f32,
     pub color: [f32; 3],
     pub intensity: f32,
-    pub light_space_matrix: [[f32; 4]; 4],
 }
 
 pub struct DirectionalLight {
@@ -28,22 +27,12 @@ impl DirectionalLight {
         let color = Vector3::new(1.0, 1.0, 1.0); // Pure white light
         let intensity = 1.0;
 
-        let mut uniform = LightUniform {
+        let uniform = LightUniform {
             direction: direction.into(),
             _padding: 0.0,
             color: color.into(),
             intensity,
-            light_space_matrix: Matrix4::identity().into(),
         };
-
-        // Create light space matrix for shadow mapping
-        let light_projection = ortho(-20.0, 20.0, -20.0, 20.0, 1.0, 100.0);
-        let light_view = Matrix4::look_at_rh(
-            Point3::new(0.0, 0.0, 0.0) + (-direction * 50.0),
-            Point3::origin(),
-            Vector3::unit_y(),
-        );
-        uniform.light_space_matrix = (light_projection * light_view).into();
 
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Light Buffer"),
@@ -89,7 +78,4 @@ impl DirectionalLight {
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.uniform]));
     }
 
-    pub fn get_light_space_matrix(&self) -> Matrix4<f32> {
-        Matrix4::from(self.uniform.light_space_matrix)
-    }
 }

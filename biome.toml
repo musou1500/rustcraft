@@ -1,0 +1,74 @@
+# Biome Configuration File
+# Edit these values and press F5 in-game to reload and see changes instantly!
+
+[Plains]
+base_height = 5
+frequency = 0.018
+amplitude = 2.5
+surface_block = "Grass"
+subsurface_block = "Dirt"
+stone_block = "Stone"
+temperature = 0.2
+humidity = 0.0
+tree_density = 0.015
+house_chance = 0.008
+
+[Desert]
+base_height = 5
+frequency = 0.015
+amplitude = 1.5
+surface_block = "Sand"
+subsurface_block = "Sand"
+stone_block = "Stone"
+temperature = 0.8
+humidity = -0.8
+tree_density = 0.0001
+house_chance = 0.002
+
+[Mountain]
+base_height = 8
+frequency = 0.02
+amplitude = 6.0
+surface_block = "Stone"
+subsurface_block = "Stone"
+stone_block = "Stone"
+temperature = -0.5
+humidity = 0.0
+tree_density = 0.005
+house_chance = 0.001
+
+[Tundra]
+base_height = 5
+frequency = 0.012
+amplitude = 1.0
+surface_block = "Snow"
+subsurface_block = "Dirt"
+stone_block = "Stone"
+temperature = -0.7
+humidity = -0.2
+tree_density = 0.002
+house_chance = 0.0005
+
+[Forest]
+base_height = 5
+frequency = 0.022
+amplitude = 3.0
+surface_block = "Grass"
+subsurface_block = "Dirt"
+stone_block = "Stone"
+temperature = 0.3
+humidity = 0.2
+tree_density = 0.08
+house_chance = 0.003
+
+[Swamp]
+base_height = 3
+frequency = 0.01
+amplitude = 0.8
+surface_block = "Grass"
+subsurface_block = "Dirt"
+stone_block = "Stone"
+temperature = 0.1
+humidity = 0.8
+tree_density = 0.04
+house_chance = 0.001

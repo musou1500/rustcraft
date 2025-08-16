@@ -1,8 +1,9 @@
 use crate::voxel::FaceTextures;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Represents different types of blocks in the world
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BlockType {
     Air,
     Stone,

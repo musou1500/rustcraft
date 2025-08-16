@@ -389,7 +389,7 @@ impl CameraSystem {
             label: Some("camera_bind_group"),
         });
 
-        let controller = CameraController::new(4.0, 1.0);
+        let controller = CameraController::new(4.0, 0.5);
 
         Self {
             camera,

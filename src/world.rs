@@ -3,6 +3,7 @@ use crate::chunk::{
     Chunk, ChunkBlocks, ChunkData, ChunkGenerator, ChunkPos, CHUNK_SIZE, WORLD_HEIGHT,
 };
 use crate::terrain::Terrain;
+use crate::biome::BiomeManager;
 use crate::voxel::{create_cube_indices_selective, create_cube_vertices_selective};
 use cgmath::Point3;
 use std::collections::HashMap;
@@ -31,7 +32,7 @@ impl World {
         }
     }
 
-    pub fn update(&mut self, camera_pos: Point3<f32>, device: &wgpu::Device) {
+    pub fn update(&mut self, camera_pos: Point3<f32>, device: &wgpu::Device, biome_manager: &BiomeManager) {
         let camera_chunk_x = (camera_pos.x / CHUNK_SIZE as f32).floor() as i32;
         let camera_chunk_z = (camera_pos.z / CHUNK_SIZE as f32).floor() as i32;
 
@@ -59,7 +60,7 @@ impl World {
                 .map(|chunk_pos| {
                     let (chunk_data, block_array) = self
                         .chunk_generator
-                        .generate_chunk(chunk_pos, &self.terrain);
+                        .generate_chunk(chunk_pos, &self.terrain, biome_manager);
                     (chunk_pos, chunk_data, block_array)
                 })
                 .collect();
@@ -473,5 +474,13 @@ impl World {
 
     pub fn get_terrain(&self) -> &Terrain {
         &self.terrain
+    }
+
+    /// Clear all loaded chunks to force regeneration with new biome configs
+    pub fn clear_all_chunks(&mut self) {
+        let chunk_count = self.chunks.len();
+        self.chunks.clear();
+        self.chunk_blocks.clear();
+        println!("Cleared {} chunks for regeneration", chunk_count);
     }
 }

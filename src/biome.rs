@@ -1,9 +1,12 @@
 use crate::blocks::BlockType;
 use noise::{NoiseFn, Perlin};
-use rayon::vec;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 
 /// Explicit biome types with unique characteristics
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Biome {
     Plains,
     Desert,
@@ -14,7 +17,7 @@ pub enum Biome {
 }
 
 /// Configuration for biome-specific terrain generation
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BiomeConfig {
     // Terrain shape parameters
     /// Base elevation level for terrain generation (in blocks above sea level)
@@ -183,5 +186,77 @@ impl Biome {
             Biome::Forest => "Forest",
             Biome::Swamp => "Swamp",
         }
+    }
+}
+
+/// Manages biome configurations with live reloading from file
+pub struct BiomeManager {
+    configs: HashMap<Biome, BiomeConfig>,
+}
+
+impl BiomeManager {
+    /// Create a new BiomeManager with default configs
+    pub fn new() -> Self {
+        Self {
+            configs: Self::load_default_configs(),
+        }
+    }
+
+    /// Load biome configurations from biome.toml file
+    pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+        let content = fs::read_to_string(path)?;
+        let configs: HashMap<Biome, BiomeConfig> = toml::from_str(&content)?;
+        
+        // Ensure all biomes are present
+        for biome in [Biome::Plains, Biome::Desert, Biome::Mountain, Biome::Tundra, Biome::Forest, Biome::Swamp] {
+            if !configs.contains_key(&biome) {
+                return Err(format!("Missing configuration for biome: {:?}", biome).into());
+            }
+        }
+        
+        Ok(Self { configs })
+    }
+
+    /// Reload configurations from file
+    pub fn reload_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), Box<dyn std::error::Error>> {
+        let content = fs::read_to_string(path)?;
+        let new_configs: HashMap<Biome, BiomeConfig> = toml::from_str(&content)?;
+        
+        // Ensure all biomes are present
+        for biome in [Biome::Plains, Biome::Desert, Biome::Mountain, Biome::Tundra, Biome::Forest, Biome::Swamp] {
+            if !new_configs.contains_key(&biome) {
+                return Err(format!("Missing configuration for biome: {:?}", biome).into());
+            }
+        }
+        
+        self.configs = new_configs;
+        println!("Biome configurations reloaded successfully!");
+        Ok(())
+    }
+
+    /// Get configuration for a specific biome
+    pub fn get_config(&self, biome: Biome) -> &BiomeConfig {
+        self.configs.get(&biome).unwrap_or_else(|| {
+            // Fallback to default if somehow missing
+            &self.configs[&Biome::Plains]
+        })
+    }
+
+    /// Create default configurations (fallback)
+    fn load_default_configs() -> HashMap<Biome, BiomeConfig> {
+        let mut configs = HashMap::new();
+        
+        for biome in [Biome::Plains, Biome::Desert, Biome::Mountain, Biome::Tundra, Biome::Forest, Biome::Swamp] {
+            configs.insert(biome, biome.get_config());
+        }
+        
+        configs
+    }
+
+    /// Save current configurations to file
+    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
+        let toml_content = toml::to_string_pretty(&self.configs)?;
+        fs::write(path, toml_content)?;
+        Ok(())
     }
 }

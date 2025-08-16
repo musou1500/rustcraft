@@ -20,7 +20,7 @@ mod voxel;
 mod wireframe;
 mod world;
 
-use biome::Biome;
+use biome::{Biome, BiomeManager};
 use camera::CameraSystem;
 use chunk_debug::ChunkDebugRenderer;
 use light::DirectionalLight;
@@ -40,12 +40,6 @@ struct State<'window> {
     world: World,
     light: DirectionalLight,
     render_pipeline: wgpu::RenderPipeline,
-    shadow_pipeline: wgpu::RenderPipeline,
-    _shadow_texture: wgpu::Texture,
-    shadow_view: wgpu::TextureView,
-    _shadow_sampler: wgpu::Sampler,
-    shadow_bind_group: wgpu::BindGroup,
-    _shadow_bind_group_layout: wgpu::BindGroupLayout,
     texture_atlas: TextureAtlas,
     _texture_bind_group_layout: wgpu::BindGroupLayout,
     wireframe_renderer: WireframeRenderer,
@@ -57,6 +51,7 @@ struct State<'window> {
     selected_block: Option<RaycastHit>,
     debug_mode: bool,
     current_biome: Option<Biome>,
+    biome_manager: BiomeManager,
 }
 
 impl<'window> State<'window> {
@@ -123,74 +118,6 @@ impl<'window> State<'window> {
         let world = World::new();
         let light = DirectionalLight::new(&device);
 
-        // Create shadow map texture
-        const SHADOW_MAP_SIZE: u32 = 2048;
-        let shadow_texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: wgpu::Extent3d {
-                width: SHADOW_MAP_SIZE,
-                height: SHADOW_MAP_SIZE,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            label: Some("Shadow Map"),
-            view_formats: &[],
-        });
-        let shadow_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        let shadow_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            compare: Some(wgpu::CompareFunction::LessEqual),
-            lod_min_clamp: 0.0,
-            lod_max_clamp: 100.0,
-            ..Default::default()
-        });
-
-        let shadow_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            sample_type: wgpu::TextureSampleType::Depth,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
-                        count: None,
-                    },
-                ],
-                label: Some("shadow_bind_group_layout"),
-            });
-
-        let shadow_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &shadow_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&shadow_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&shadow_sampler),
-                },
-            ],
-            label: Some("shadow_bind_group"),
-        });
 
         // Create texture atlas bind group layout
         let texture_bind_group_layout =
@@ -224,18 +151,6 @@ impl<'window> State<'window> {
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
-        let shadow_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shadow Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shadow.wgsl").into()),
-        });
-
-        // Shadow pipeline layout
-        let shadow_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Shadow Pipeline Layout"),
-                bind_group_layouts: &[&light.bind_group_layout],
-                push_constant_ranges: &[],
-            });
 
         // Main render pipeline layout
         let render_pipeline_layout =
@@ -244,49 +159,11 @@ impl<'window> State<'window> {
                 bind_group_layouts: &[
                     &camera.bind_group_layout,
                     &light.bind_group_layout,
-                    &shadow_bind_group_layout,
                     &texture_bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             });
 
-        // Shadow pipeline
-        let shadow_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Shadow Pipeline"),
-            layout: Some(&shadow_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shadow_shader,
-                entry_point: "vs_main",
-                buffers: &[voxel::Vertex::desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shadow_shader,
-                entry_point: "fs_main",
-                targets: &[],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Front), // Front face culling for shadow mapping
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        });
 
         let wireframe_renderer =
             WireframeRenderer::new(&device, surface_format, &camera.bind_group_layout);
@@ -351,12 +228,6 @@ impl<'window> State<'window> {
             world,
             light,
             render_pipeline,
-            shadow_pipeline,
-            _shadow_texture: shadow_texture,
-            shadow_view,
-            _shadow_sampler: shadow_sampler,
-            shadow_bind_group,
-            _shadow_bind_group_layout: shadow_bind_group_layout,
             texture_atlas,
             _texture_bind_group_layout: texture_bind_group_layout,
             wireframe_renderer,
@@ -368,6 +239,10 @@ impl<'window> State<'window> {
             selected_block: None,
             debug_mode: false,
             current_biome: None,
+            biome_manager: BiomeManager::load_from_file("biome.toml").unwrap_or_else(|e| {
+                println!("Failed to load biome.toml: {}. Using default configs.", e);
+                BiomeManager::new()
+            }),
         })
     }
 
@@ -447,6 +322,19 @@ impl<'window> State<'window> {
                     println!("Debug mode: {}", if self.debug_mode { "ON" } else { "OFF" });
                     return true;
                 }
+                KeyCode::F5 => {
+                    match self.biome_manager.reload_from_file("biome.toml") {
+                        Ok(()) => {
+                            // Clear and regenerate all chunks
+                            self.world.clear_all_chunks();
+                            println!("Biome configuration reloaded! All chunks regenerated.");
+                        }
+                        Err(e) => {
+                            println!("Failed to reload biome.toml: {}", e);
+                        }
+                    }
+                    return true;
+                }
                 _ => {}
             }
         }
@@ -501,7 +389,8 @@ impl<'window> State<'window> {
         self.light.update_buffer(&self.queue);
 
         let camera_pos = self.camera.get_position();
-        self.world.update(camera_pos, &self.device);
+        self.world
+            .update(camera_pos, &self.device, &self.biome_manager);
 
         // Check for biome changes
         let world_x = camera_pos.x.floor() as i32;
@@ -693,27 +582,6 @@ impl<'window> State<'window> {
                 label: Some("Render Encoder"),
             });
 
-        // Shadow pass
-        {
-            let mut shadow_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Shadow Pass"),
-                color_attachments: &[],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.shadow_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
-
-            shadow_pass.set_pipeline(&self.shadow_pipeline);
-            shadow_pass.set_bind_group(0, &self.light.bind_group, &[]);
-            self.world.render(&mut shadow_pass);
-        }
 
         // Main render pass
         {
@@ -748,8 +616,7 @@ impl<'window> State<'window> {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera.bind_group, &[]);
             render_pass.set_bind_group(1, &self.light.bind_group, &[]);
-            render_pass.set_bind_group(2, &self.shadow_bind_group, &[]);
-            render_pass.set_bind_group(3, &self.texture_atlas.bind_group, &[]);
+            render_pass.set_bind_group(2, &self.texture_atlas.bind_group, &[]);
             self.world.render(&mut render_pass);
 
             // Render block selection wireframe

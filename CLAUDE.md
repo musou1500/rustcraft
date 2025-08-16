@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a Minecraft-like voxel game built in Rust using the wgpu graphics library. The game features:
 - Chunk-based terrain generation with procedural noise
 - Block breaking/placing mechanics with raycasting
-- Real-time lighting and shadow mapping
+- Real-time lighting
 - Inventory system with 10 slots (keys 1-0)
 - First-person camera with physics-based movement
 - Texture atlas system for block rendering
@@ -52,20 +52,18 @@ cargo check
 - **blocks.rs**: Block type definitions, material properties, texture mapping registry, and generation logic
 - **raycast.rs**: Ray-casting for block selection and interaction
 - **slot_ui.rs**: Inventory slot rendering and UI management
-- **light.rs**: Lighting system and shadow mapping
+- **light.rs**: Lighting system
 
 **Debug & Development:**
 - **chunk_debug.rs**: Debug visualization and chunk information display
 
 ### Rendering Pipeline
 
-The game uses a dual-pass rendering system:
-1. **Shadow Pass**: Renders depth information for shadow mapping
-2. **Main Pass**: Renders the world with lighting, shadows, and UI elements
+The game uses a single-pass rendering system:
+1. **Main Pass**: Renders the world with lighting and UI elements
 
 Shaders are located in src/ as .wgsl files:
 - `shader.wgsl`: Main vertex/fragment shaders for world rendering
-- `shadow.wgsl`: Shadow mapping shaders
 - `wireframe.wgsl`: Block selection wireframe rendering
 - `slot_ui.wgsl`: Inventory slot rendering
 
@@ -120,6 +118,8 @@ Shaders are located in src/ as .wgsl files:
 - Left click: Break/place blocks
 - Right click: Pick up blocks
 - ESC: Toggle cursor lock/unlock
+- F3: Toggle debug mode
+- F5: Reload biome configuration from biome.toml
 
 ### Coordinate System
 - X: East/West
@@ -136,3 +136,18 @@ Shaders are located in src/ as .wgsl files:
 - Adjust structure placement frequency by modifying `should_place_structure()` thresholds
 - Add new UI elements by following the pattern in slot_ui.rs
 - Extend the block registry for new materials and textures
+
+### Live Biome Configuration
+The game now supports live reloading of biome configurations from `biome.toml`:
+
+1. **Edit biome.toml**: Modify any biome parameters like height, frequency, amplitude, block types, temperature, humidity, tree density, or house spawn rates
+2. **Press F5 in-game**: Instantly reload the configuration and regenerate all loaded chunks
+3. **See changes immediately**: No need to restart the game or recompile
+
+Example biome.toml modifications:
+- Increase `amplitude` for more dramatic terrain variation
+- Change `surface_block` to experiment with different biome appearances  
+- Adjust `tree_density` to make forests denser or sparser
+- Modify `base_height` to change biome elevation levels
+
+**Note**: F5 clears all loaded chunks and regenerates them with the new configuration, so you'll see the changes applied to the current view area.

@@ -1,4 +1,4 @@
-use crate::biome::Biome;
+use crate::biome::{Biome, BiomeManager};
 use crate::blocks::BlockType;
 use crate::chunk::CHUNK_SIZE;
 use noise::{NoiseFn, Perlin};
@@ -510,7 +510,7 @@ impl StructureGenerator {
     }
 
     /// Get the type of structure to place based on biome and randomness
-    pub fn get_structure_type(&self, world_x: i32, world_z: i32, biome: Biome) -> StructureType {
+    pub fn get_structure_type(&self, world_x: i32, world_z: i32, biome: Biome, biome_manager: &BiomeManager) -> StructureType {
         // Create a deterministic RNG based on position
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         use std::hash::{Hash, Hasher};
@@ -522,7 +522,7 @@ impl StructureGenerator {
         let mut rng = StdRng::seed_from_u64(hash);
         let structure_roll = rng.gen::<f32>();
 
-        let config = biome.get_config();
+        let config = biome_manager.get_config(biome);
 
         // Use biome-specific structure spawn rates
         if structure_roll < (config.tree_density * 100.0) as f32 {
@@ -543,6 +543,7 @@ impl StructureGenerator {
         terrain_height_map: &[[usize; CHUNK_SIZE]; CHUNK_SIZE],
         biome_map: &[[Biome; CHUNK_SIZE]; CHUNK_SIZE],
         terrain: &crate::terrain::Terrain,
+        biome_manager: &BiomeManager,
     ) -> Vec<PlacedStructure> {
         let mut structures = Vec::new();
 
@@ -583,7 +584,7 @@ impl StructureGenerator {
                     )
                 } else {
                     // Position is outside current chunk - query terrain for values
-                    let height = terrain.height_at(world_x, world_z);
+                    let height = terrain.height_at(world_x, world_z, biome_manager);
                     let biome = terrain.biome_at(world_x, world_z);
                     (height, biome)
                 };
@@ -597,7 +598,7 @@ impl StructureGenerator {
                 let hash = hasher.finish();
                 let mut rng = StdRng::seed_from_u64(hash);
 
-                let structure_type = self.get_structure_type(world_x, world_z, biome);
+                let structure_type = self.get_structure_type(world_x, world_z, biome, biome_manager);
 
                 let structure: Box<dyn Structure> = match structure_type {
                     StructureType::Tree => {
@@ -631,7 +632,7 @@ impl StructureGenerator {
                                 terrain_height_map[check_local_x as usize][check_local_z as usize]
                                     as i32
                             } else {
-                                terrain.height_at(check_world_x, check_world_z) as i32
+                                terrain.height_at(check_world_x, check_world_z, biome_manager) as i32
                             };
 
                             height_variance =

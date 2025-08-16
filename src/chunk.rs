@@ -2,6 +2,7 @@ use crate::biome::Biome;
 use crate::blocks::{get_block_registry, BlockType};
 use crate::structures::{PlacedStructure, StructureGenerator};
 use crate::terrain::Terrain;
+use crate::biome::BiomeManager;
 use crate::voxel::{create_cube_indices_selective, create_cube_vertices_selective, Vertex};
 use rayon::prelude::*;
 
@@ -46,6 +47,7 @@ impl ChunkGenerator {
         &self,
         chunk_pos: ChunkPos,
         terrain: &Terrain,
+        biome_manager: &BiomeManager,
     ) -> (ChunkData, ChunkBlocks) {
         // Generate height and biome maps for structure generation
         let mut height_values = [[0usize; CHUNK_SIZE]; CHUNK_SIZE];
@@ -56,7 +58,7 @@ impl ChunkGenerator {
                 let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
                 let world_z = chunk_pos.z * CHUNK_SIZE as i32 + z as i32;
 
-                let height = terrain.height_at(world_x, world_z);
+                let height = terrain.height_at(world_x, world_z, biome_manager);
                 let biome = terrain.biome_at(world_x, world_z);
 
                 height_values[x][z] = height;
@@ -71,10 +73,11 @@ impl ChunkGenerator {
             &height_values,
             &biome_map,
             terrain,
+            biome_manager,
         );
 
         // Generate chunk data with terrain and structures combined
-        self.generate_chunk_data(chunk_pos, &structures, terrain)
+        self.generate_chunk_data(chunk_pos, &structures, terrain, biome_manager)
     }
 
     fn generate_chunk_data(
@@ -82,6 +85,7 @@ impl ChunkGenerator {
         chunk_pos: ChunkPos,
         structures: &[PlacedStructure],
         terrain: &Terrain,
+        biome_manager: &BiomeManager,
     ) -> (ChunkData, ChunkBlocks) {
         let mut vertices = Vec::new();
         let mut indices: Vec<u32> = Vec::new();
@@ -94,21 +98,19 @@ impl ChunkGenerator {
         let mut height_values = vec![vec![0usize; CHUNK_SIZE]; CHUNK_SIZE];
         let mut biome_map = vec![vec![Biome::Plains; CHUNK_SIZE]; CHUNK_SIZE];
 
-        // Compute height and biome data in parallel
-        let terrain_data: Vec<(usize, usize, usize, Biome)> = (0..CHUNK_SIZE)
-            .into_par_iter()
-            .flat_map(|x| {
-                (0..CHUNK_SIZE).into_par_iter().map(move |z| {
-                    let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
-                    let world_z = chunk_pos.z * CHUNK_SIZE as i32 + z as i32;
+        // Compute height and biome data sequentially
+        let mut terrain_data = Vec::new();
+        for x in 0..CHUNK_SIZE {
+            for z in 0..CHUNK_SIZE {
+                let world_x = chunk_pos.x * CHUNK_SIZE as i32 + x as i32;
+                let world_z = chunk_pos.z * CHUNK_SIZE as i32 + z as i32;
 
-                    let height = terrain.height_at(world_x, world_z);
-                    let biome = terrain.biome_at(world_x, world_z);
+                let height = terrain.height_at(world_x, world_z, biome_manager);
+                let biome = terrain.biome_at(world_x, world_z);
 
-                    (x, z, height, biome)
-                })
-            })
-            .collect();
+                terrain_data.push((x, z, height, biome));
+            }
+        }
 
         // Store the computed values
         for (x, z, height, biome) in terrain_data {
@@ -117,7 +119,7 @@ impl ChunkGenerator {
         }
 
         // Generate terrain blocks using pre-computed biome data
-        chunk_blocks = terrain.generate_terrain_blocks(chunk_pos, &height_values, &biome_map);
+        chunk_blocks = terrain.generate_terrain_blocks(chunk_pos, &height_values, &biome_map, biome_manager);
 
         // Place structure blocks into the chunk
         for structure in structures {
