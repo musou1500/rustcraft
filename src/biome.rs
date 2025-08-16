@@ -206,29 +206,46 @@ impl BiomeManager {
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let content = fs::read_to_string(path)?;
         let configs: HashMap<Biome, BiomeConfig> = toml::from_str(&content)?;
-        
+
         // Ensure all biomes are present
-        for biome in [Biome::Plains, Biome::Desert, Biome::Mountain, Biome::Tundra, Biome::Forest, Biome::Swamp] {
+        for biome in [
+            Biome::Plains,
+            Biome::Desert,
+            Biome::Mountain,
+            Biome::Tundra,
+            Biome::Forest,
+            Biome::Swamp,
+        ] {
             if !configs.contains_key(&biome) {
                 return Err(format!("Missing configuration for biome: {:?}", biome).into());
             }
         }
-        
+
         Ok(Self { configs })
     }
 
     /// Reload configurations from file
-    pub fn reload_from_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn reload_from_file<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let content = fs::read_to_string(path)?;
         let new_configs: HashMap<Biome, BiomeConfig> = toml::from_str(&content)?;
-        
+
         // Ensure all biomes are present
-        for biome in [Biome::Plains, Biome::Desert, Biome::Mountain, Biome::Tundra, Biome::Forest, Biome::Swamp] {
+        for biome in [
+            Biome::Plains,
+            Biome::Desert,
+            Biome::Mountain,
+            Biome::Tundra,
+            Biome::Forest,
+            Biome::Swamp,
+        ] {
             if !new_configs.contains_key(&biome) {
                 return Err(format!("Missing configuration for biome: {:?}", biome).into());
             }
         }
-        
+
         self.configs = new_configs;
         println!("Biome configurations reloaded successfully!");
         Ok(())
@@ -245,11 +262,18 @@ impl BiomeManager {
     /// Create default configurations (fallback)
     fn load_default_configs() -> HashMap<Biome, BiomeConfig> {
         let mut configs = HashMap::new();
-        
-        for biome in [Biome::Plains, Biome::Desert, Biome::Mountain, Biome::Tundra, Biome::Forest, Biome::Swamp] {
+
+        for biome in [
+            Biome::Plains,
+            Biome::Desert,
+            Biome::Mountain,
+            Biome::Tundra,
+            Biome::Forest,
+            Biome::Swamp,
+        ] {
             configs.insert(biome, biome.get_config());
         }
-        
+
         configs
     }
 

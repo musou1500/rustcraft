@@ -211,7 +211,6 @@ impl BlockRegistry {
             },
         );
 
-
         // Snow - white, soft
         self.register(
             BlockType::Snow,
@@ -265,7 +264,6 @@ impl BlockRegistry {
         );
     }
 }
-
 
 use std::sync::OnceLock;
 

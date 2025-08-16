@@ -311,7 +311,6 @@ impl CameraController {
         false
     }
 
-
     pub fn was_left_mouse_clicked(&mut self) -> bool {
         if self.left_mouse_pressed {
             self.left_mouse_pressed = false; // Reset the flag

@@ -77,5 +77,4 @@ impl DirectionalLight {
     pub fn update_buffer(&self, queue: &wgpu::Queue) {
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.uniform]));
     }
-
 }

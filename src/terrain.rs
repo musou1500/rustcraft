@@ -43,8 +43,14 @@ impl Terrain {
                     // Generate terrain blocks (removed/placed blocks will be handled after generation)
                     if y < height.min(TERRAIN_MAX_HEIGHT) {
                         // Use new biome-aware block selection
-                        chunk_blocks[x][z][y] =
-                            self.get_block_for_position(world_x, y, world_z, height, biome, biome_manager);
+                        chunk_blocks[x][z][y] = self.get_block_for_position(
+                            world_x,
+                            y,
+                            world_z,
+                            height,
+                            biome,
+                            biome_manager,
+                        );
                     }
                 }
             }
@@ -56,7 +62,8 @@ impl Terrain {
     /// Calculate terrain height at any world position using IWD-blended heights from nearby biomes
     pub fn height_at(&self, world_x: i32, world_z: i32, biome_manager: &BiomeManager) -> usize {
         let current_biome = self.biome_selector.select_biome(world_x, world_z);
-        let current_height = self.calculate_height_for_biome(world_x, world_z, current_biome, biome_manager);
+        let current_height =
+            self.calculate_height_for_biome(world_x, world_z, current_biome, biome_manager);
 
         // Find nearby biome boundaries
         let biome_boundaries = self.find_biome_boundaries(world_x, world_z);
@@ -71,8 +78,12 @@ impl Terrain {
         let mut weight_sum = 0.0;
 
         for (boundary_x, boundary_y, boundary_biome) in biome_boundaries {
-            let boundary_height =
-                self.calculate_height_for_biome(boundary_x, boundary_y, boundary_biome, biome_manager);
+            let boundary_height = self.calculate_height_for_biome(
+                boundary_x,
+                boundary_y,
+                boundary_biome,
+                biome_manager,
+            );
             let distance =
                 (((world_x - boundary_x).pow(2) + (world_z - boundary_y).pow(2)) as f64).sqrt();
             let weight = 1.0 / distance;
@@ -87,7 +98,13 @@ impl Terrain {
     }
 
     /// Calculate height for a specific biome using octave-based noise
-    fn calculate_height_for_biome(&self, world_x: i32, world_z: i32, biome: Biome, biome_manager: &BiomeManager) -> usize {
+    fn calculate_height_for_biome(
+        &self,
+        world_x: i32,
+        world_z: i32,
+        biome: Biome,
+        biome_manager: &BiomeManager,
+    ) -> usize {
         let config = biome_manager.get_config(biome);
         let world_x = world_x as f64;
         let world_z = world_z as f64;

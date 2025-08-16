@@ -510,7 +510,13 @@ impl StructureGenerator {
     }
 
     /// Get the type of structure to place based on biome and randomness
-    pub fn get_structure_type(&self, world_x: i32, world_z: i32, biome: Biome, biome_manager: &BiomeManager) -> StructureType {
+    pub fn get_structure_type(
+        &self,
+        world_x: i32,
+        world_z: i32,
+        biome: Biome,
+        biome_manager: &BiomeManager,
+    ) -> StructureType {
         // Create a deterministic RNG based on position
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         use std::hash::{Hash, Hasher};
@@ -598,7 +604,8 @@ impl StructureGenerator {
                 let hash = hasher.finish();
                 let mut rng = StdRng::seed_from_u64(hash);
 
-                let structure_type = self.get_structure_type(world_x, world_z, biome, biome_manager);
+                let structure_type =
+                    self.get_structure_type(world_x, world_z, biome, biome_manager);
 
                 let structure: Box<dyn Structure> = match structure_type {
                     StructureType::Tree => {
@@ -632,7 +639,8 @@ impl StructureGenerator {
                                 terrain_height_map[check_local_x as usize][check_local_z as usize]
                                     as i32
                             } else {
-                                terrain.height_at(check_world_x, check_world_z, biome_manager) as i32
+                                terrain.height_at(check_world_x, check_world_z, biome_manager)
+                                    as i32
                             };
 
                             height_variance =

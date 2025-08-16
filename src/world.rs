@@ -1,9 +1,9 @@
+use crate::biome::BiomeManager;
 use crate::blocks::BlockType;
 use crate::chunk::{
     Chunk, ChunkBlocks, ChunkData, ChunkGenerator, ChunkPos, CHUNK_SIZE, WORLD_HEIGHT,
 };
 use crate::terrain::Terrain;
-use crate::biome::BiomeManager;
 use crate::voxel::{create_cube_indices_selective, create_cube_vertices_selective};
 use cgmath::Point3;
 use std::collections::HashMap;
@@ -32,7 +32,12 @@ impl World {
         }
     }
 
-    pub fn update(&mut self, camera_pos: Point3<f32>, device: &wgpu::Device, biome_manager: &BiomeManager) {
+    pub fn update(
+        &mut self,
+        camera_pos: Point3<f32>,
+        device: &wgpu::Device,
+        biome_manager: &BiomeManager,
+    ) {
         let camera_chunk_x = (camera_pos.x / CHUNK_SIZE as f32).floor() as i32;
         let camera_chunk_z = (camera_pos.z / CHUNK_SIZE as f32).floor() as i32;
 
@@ -58,9 +63,11 @@ impl World {
             let chunk_data_results: Vec<(ChunkPos, ChunkData, ChunkBlocks)> = chunks_to_generate
                 .into_par_iter()
                 .map(|chunk_pos| {
-                    let (chunk_data, block_array) = self
-                        .chunk_generator
-                        .generate_chunk(chunk_pos, &self.terrain, biome_manager);
+                    let (chunk_data, block_array) = self.chunk_generator.generate_chunk(
+                        chunk_pos,
+                        &self.terrain,
+                        biome_manager,
+                    );
                     (chunk_pos, chunk_data, block_array)
                 })
                 .collect();
