@@ -206,7 +206,7 @@ impl BlockRegistry {
                 textures: FaceTextures::all_same(TextureId::Leaves as u32),
                 hardness: 0.3,
                 is_solid: true,
-                is_transparent: false,
+                is_transparent: true,
                 emission: 0.0,
             },
         );

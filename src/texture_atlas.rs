@@ -1,3 +1,5 @@
+use crate::texture_parser;
+
 pub struct TextureAtlas {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
@@ -11,25 +13,32 @@ impl TextureAtlas {
         queue: &wgpu::Queue,
         bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        // Create a simple 4x4 texture atlas with Minecraft-like block textures
+        // Create a 4x4 texture atlas with loaded block textures
         // Each texture is 16x16 pixels for a total of 64x64 atlas
         let atlas_size = 64u32;
         let tile_size = 16u32;
 
-        // Generate procedural textures for each block type
+        // Load textures from .texture files
+        let loaded_textures = texture_parser::load_all_textures().unwrap_or_else(|e| {
+            eprintln!("Failed to load textures: {}", e);
+            std::collections::HashMap::new()
+        });
+
+        // Create the atlas data
         let mut atlas_data = vec![0u8; (atlas_size * atlas_size * 4) as usize]; // RGBA
 
-        // Fill the atlas with different textures
+        // Fill the atlas with loaded textures
         for tile_y in 0..4 {
             for tile_x in 0..4 {
                 let texture_id = tile_y * 4 + tile_x;
-                generate_texture(
+                copy_texture_to_atlas(
                     &mut atlas_data,
                     atlas_size,
                     tile_x * tile_size,
                     tile_y * tile_size,
                     tile_size,
                     texture_id,
+                    &loaded_textures,
                 );
             }
         }
@@ -105,172 +114,85 @@ impl TextureAtlas {
     }
 }
 
-// Generate procedural textures for different block types
-fn generate_texture(
+// Copy loaded textures to atlas positions
+fn copy_texture_to_atlas(
     atlas_data: &mut [u8],
     atlas_width: u32,
     start_x: u32,
     start_y: u32,
     size: u32,
     texture_id: u32,
+    loaded_textures: &std::collections::HashMap<String, texture_parser::ParsedTexture>,
 ) {
-    for y in 0..size {
-        for x in 0..size {
-            let atlas_x = start_x + x;
-            let atlas_y = start_y + y;
-            let index = ((atlas_y * atlas_width + atlas_x) * 4) as usize;
+    // Map texture IDs to texture file names
+    let texture_name = match texture_id {
+        0 => "stone",        // Stone
+        1 => "dirt",         // Dirt
+        2 => "grass_top",    // Grass Top
+        3 => "grass_side",   // Grass Side
+        4 => "sand",         // Sand
+        5 => "water",        // Water
+        6 => "wood_top",     // Wood Top
+        7 => "wood_side",    // Wood Side
+        8 => "leaves",       // Leaves
+        9 => "snow",         // Snow
+        10 => "bedrock",     // Bedrock
+        11 => "planks",      // Planks
+        12 => "cobblestone", // Cobblestone
+        13 => "glass",       // Glass
+        _ => "stone",        // Default to stone
+    };
 
-            let (r, g, b) = match texture_id {
-                0 => generate_stone_texture(x, y, size),      // Stone
-                1 => generate_dirt_texture(x, y, size),       // Dirt
-                2 => generate_grass_top_texture(x, y, size),  // Grass Top
-                3 => generate_grass_side_texture(x, y, size), // Grass Side
-                4 => generate_sand_texture(x, y, size),       // Sand
-                5 => generate_water_texture(x, y, size),      // Water
-                6 => generate_wood_top_texture(x, y, size),   // Wood Top
-                7 => generate_wood_side_texture(x, y, size),  // Wood Side
-                8 => generate_leaves_texture(x, y, size),     // Leaves
-                9 => generate_snow_texture(x, y, size),       // Snow
-                10 => generate_bedrock_texture(x, y, size),   // Bedrock
-                11 => generate_planks_texture(x, y, size),    // Planks
-                12 => generate_cobblestone_texture(x, y, size), // Cobblestone
-                13 => generate_glass_texture(x, y, size),     // Glass
-                _ => (128, 128, 128),                         // Default gray
-            };
+    // Get the loaded texture or use a fallback
+    if let Some(texture) = loaded_textures.get(texture_name) {
+        // Copy texture data to atlas
+        for y in 0..size {
+            for x in 0..size {
+                let atlas_x = start_x + x;
+                let atlas_y = start_y + y;
+                let atlas_index = ((atlas_y * atlas_width + atlas_x) * 4) as usize;
 
-            if index + 3 < atlas_data.len() {
-                atlas_data[index] = r;
-                atlas_data[index + 1] = g;
-                atlas_data[index + 2] = b;
-                atlas_data[index + 3] = 255; // Alpha
+                if x < texture.width && y < texture.height {
+                    let texture_index = ((y * texture.width + x) * 4) as usize;
+
+                    if atlas_index + 3 < atlas_data.len()
+                        && texture_index + 3 < texture.pixels.len()
+                    {
+                        atlas_data[atlas_index] = texture.pixels[texture_index]; // R
+                        atlas_data[atlas_index + 1] = texture.pixels[texture_index + 1]; // G
+                        atlas_data[atlas_index + 2] = texture.pixels[texture_index + 2]; // B
+                        atlas_data[atlas_index + 3] = texture.pixels[texture_index + 3];
+                        // A
+                    }
+                }
             }
         }
-    }
-}
-
-// Texture generation functions for different block types
-fn generate_stone_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 7 + y * 13) % 31) as f32 / 31.0;
-    let base = 120;
-    let variation = (noise * 40.0) as u8;
-    (base + variation, base + variation, base + variation + 10)
-}
-
-fn generate_dirt_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 11 + y * 17) % 23) as f32 / 23.0;
-    let r = (100.0 + noise * 50.0) as u8;
-    let g = (65.0 + noise * 35.0) as u8;
-    let b = (35.0 + noise * 20.0) as u8;
-    (r, g, b)
-}
-
-fn generate_grass_top_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 5 + y * 7) % 19) as f32 / 19.0;
-    let r = (30.0 + noise * 40.0) as u8;
-    let g = (120.0 + noise * 60.0) as u8;
-    let b = (30.0 + noise * 40.0) as u8;
-    (r, g, b)
-}
-
-fn generate_grass_side_texture(x: u32, y: u32, size: u32) -> (u8, u8, u8) {
-    if y < size / 4 {
-        // Top portion - grass
-        generate_grass_top_texture(x, y, size)
     } else {
-        // Bottom portion - dirt
-        generate_dirt_texture(x, y, size)
+        // Fallback: generate a simple colored pattern if texture not found
+        let (r, g, b, a) = match texture_id {
+            0 => (128, 128, 128, 255), // Stone - gray
+            1 => (139, 90, 43, 255),   // Dirt - brown
+            _ => (255, 0, 255, 255),   // Magenta for missing textures
+        };
+
+        for y in 0..size {
+            for x in 0..size {
+                let atlas_x = start_x + x;
+                let atlas_y = start_y + y;
+                let atlas_index = ((atlas_y * atlas_width + atlas_x) * 4) as usize;
+
+                if atlas_index + 3 < atlas_data.len() {
+                    atlas_data[atlas_index] = r;
+                    atlas_data[atlas_index + 1] = g;
+                    atlas_data[atlas_index + 2] = b;
+                    atlas_data[atlas_index + 3] = a; // Use proper alpha value
+                }
+            }
+        }
+
+        eprintln!(
+            "Warning: Texture '{}' not found, using fallback color",
+            texture_name
+        );
     }
-}
-
-fn generate_sand_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 13 + y * 19) % 29) as f32 / 29.0;
-    let r = (220.0 + noise * 35.0) as u8;
-    let g = (195.0 + noise * 30.0) as u8;
-    let b = (140.0 + noise * 25.0) as u8;
-    (r, g, b)
-}
-
-fn generate_water_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 3 + y * 5) % 13) as f32 / 13.0;
-    let r = (30.0 + noise * 30.0) as u8;
-    let g = (100.0 + noise * 40.0) as u8;
-    let b = (200.0 + noise * 55.0) as u8;
-    (r, g, b)
-}
-
-fn generate_wood_top_texture(x: u32, y: u32, size: u32) -> (u8, u8, u8) {
-    let center_x = size as f32 / 2.0;
-    let center_y = size as f32 / 2.0;
-    let dist = ((x as f32 - center_x).powi(2) + (y as f32 - center_y).powi(2)).sqrt();
-    let ring = (dist * 2.0) as u32 % 3;
-    let base_r = 140;
-    let base_g = 85;
-    let base_b = 50;
-    match ring {
-        0 => (base_r, base_g, base_b),
-        1 => (base_r - 20, base_g - 15, base_b - 10),
-        _ => (base_r + 15, base_g + 10, base_b + 5),
-    }
-}
-
-fn generate_wood_side_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let stripe = (x / 2) % 3;
-    let base_r = 120;
-    let base_g = 75;
-    let base_b = 45;
-    let noise = ((x * 7 + y * 11) % 17) as f32 / 17.0 * 20.0;
-    match stripe {
-        0 => (
-            (base_r as f32 + noise) as u8,
-            (base_g as f32 + noise * 0.7) as u8,
-            (base_b as f32 + noise * 0.5) as u8,
-        ),
-        1 => ((base_r - 15) as u8, (base_g - 10) as u8, (base_b - 8) as u8),
-        _ => ((base_r + 10) as u8, (base_g + 8) as u8, (base_b + 5) as u8),
-    }
-}
-
-fn generate_leaves_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 9 + y * 15) % 21) as f32 / 21.0;
-    let r = (25.0 + noise * 35.0) as u8;
-    let g = (100.0 + noise * 70.0) as u8;
-    let b = (25.0 + noise * 35.0) as u8;
-    (r, g, b)
-}
-
-
-fn generate_snow_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 2 + y * 3) % 7) as f32 / 7.0;
-    let brightness = (235.0 + noise * 20.0) as u8;
-    (brightness, brightness, brightness.saturating_add(5))
-}
-
-fn generate_bedrock_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 13 + y * 7) % 17) as f32 / 17.0;
-    let brightness = (10.0 + noise * 25.0) as u8;
-    (brightness, brightness, brightness.saturating_add(5))
-}
-
-fn generate_planks_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let wood_grain = if y % 4 < 2 { 1.0 } else { 0.8 };
-    let noise = ((x * 5 + y * 7) % 13) as f32 / 13.0;
-    let r = (140.0 * wood_grain + noise * 20.0) as u8;
-    let g = (100.0 * wood_grain + noise * 15.0) as u8;
-    let b = (60.0 * wood_grain + noise * 10.0) as u8;
-    (r, g, b)
-}
-
-fn generate_cobblestone_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let stone_pattern = ((x / 4 + y / 4) % 2) as f32 * 0.1 + 0.9;
-    let noise = ((x * 7 + y * 11) % 19) as f32 / 19.0;
-    let brightness = (90.0 * stone_pattern + noise * 40.0) as u8;
-    (brightness, brightness, brightness.saturating_add(10))
-}
-
-fn generate_glass_texture(x: u32, y: u32, _size: u32) -> (u8, u8, u8) {
-    let noise = ((x * 3 + y * 5) % 11) as f32 / 11.0;
-    let r = (200.0 + noise * 20.0) as u8;
-    let g = (220.0 + noise * 15.0) as u8;
-    let b = (240.0 + noise * 15.0) as u8;
-    (r, g, b)
 }

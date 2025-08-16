@@ -65,9 +65,9 @@ fn get_atlas_coords(tex_coords: vec2<f32>, texture_id: u32) -> vec2<f32> {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // Sample from texture atlas
+    // Sample from texture atlas (including alpha channel)
     let atlas_coords = get_atlas_coords(in.tex_coords, in.texture_id);
-    let texture_color = textureSample(texture_atlas, texture_sampler, atlas_coords).rgb;
+    let texture_color = textureSample(texture_atlas, texture_sampler, atlas_coords);
     
     // Use the actual surface normal from the vertex
     let normal = normalize(in.normal);
@@ -75,11 +75,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     
     // Calculate diffuse lighting with good ambient
     let diffuse_strength = max(dot(normal, light_dir), 0.0);
-    let ambient = 0.3; // Ambient lighting
+    let ambient = 0.4; // Ambient lighting - increased for softer shadows
     let lighting = ambient + (1.0 - ambient) * diffuse_strength;
     
-    // Apply lighting to the texture color
-    let final_color = texture_color * lighting;
+    // Apply lighting to the RGB channels, preserve alpha
+    let final_color = vec3<f32>(texture_color.rgb * lighting);
     
-    return vec4<f32>(final_color, 1.0);
+    return vec4<f32>(final_color, texture_color.a);
 }

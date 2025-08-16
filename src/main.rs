@@ -16,6 +16,7 @@ mod slot_ui;
 mod structures;
 mod terrain;
 mod texture_atlas;
+mod texture_parser;
 mod voxel;
 mod wireframe;
 mod world;
@@ -187,7 +188,7 @@ impl<'window> State<'window> {
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),

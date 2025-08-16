@@ -1,0 +1,31 @@
+[texture]
+name = "Grass Top"
+description = "Green grass texture for the top face of grass blocks"
+size = [16, 16]
+
+[palette]
+"." = "#4A7C2A"  # Base green (74, 124, 42)
+"," = "#54872F"  # Light green (84, 135, 47) - reduced contrast
+":" = "#406C22"  # Dark green (64, 108, 34) - increased from original
+"*" = "#5A9536"  # Bright green (90, 149, 54) - reduced contrast
+"#" = "#365514"  # Very dark green (54, 85, 20) - increased from original
+
+[pixels]
+data = '''
+*,:..*,:..,:,*:.
+,:*,.:#.,*,.:,.*
+.#,*,:.,*,*,:.,#
+*,:..,*,:..*,:.,
+,.:*.*:#*,:.*.,#
+.#,*,:.,:,*,:.,#
+#,:..,*,:..*,*:.
+,*,.,:*.,*,.:,**
+.#,*,:.,:,*,:.,#
+*,:..,*,:..*,:.,
+,.:*.*:#*,:.*.,#
+.#,*,:.,:,*,:.,#
+#,:..,*,:..*,*:.
+,*,.,:*.,*,.:,**
+.#,*,:.,:,*,:.,#
+*,:..,*,:..*,:.,
+'''
