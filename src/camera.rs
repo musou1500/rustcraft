@@ -273,12 +273,10 @@ impl CameraController {
 
         if self.check_collision(collision_pos, world) {
             if self.velocity_y < 0.0 {
-                // Hit ground
+                // Hit ground - stop at current position, don't teleport
                 self.velocity_y = 0.0;
                 self.is_grounded = true;
-                // Snap to ground level
-                camera.position.y =
-                    self.find_ground_level(camera.position.x, camera.position.z, world);
+                // Keep current Y position instead of snapping to arbitrary height
             } else {
                 // Hit ceiling
                 self.velocity_y = 0.0;
@@ -313,19 +311,6 @@ impl CameraController {
         false
     }
 
-    fn find_ground_level(&self, x: f32, z: f32, world: &crate::world::World) -> f32 {
-        let block_x = x.floor() as i32;
-        let block_z = z.floor() as i32;
-
-        // Search downward for the highest solid block
-        for y in (0..crate::chunk::WORLD_HEIGHT as i32).rev() {
-            if world.is_block_solid(block_x, y, block_z) {
-                // Return eye level position (feet position + eye height)
-                return (y + 1) as f32 + self.eye_height;
-            }
-        }
-        self.eye_height // Default to eye height above ground level if no solid block found
-    }
 
     pub fn was_left_mouse_clicked(&mut self) -> bool {
         if self.left_mouse_pressed {
@@ -343,6 +328,11 @@ impl CameraController {
         } else {
             false
         }
+    }
+
+    pub fn reset_mouse_deltas(&mut self) {
+        self.mouse_dx = 0.0;
+        self.mouse_dy = 0.0;
     }
 }
 
@@ -436,5 +426,9 @@ impl CameraSystem {
 
     pub fn was_right_mouse_clicked(&mut self) -> bool {
         self.controller.was_right_mouse_clicked()
+    }
+
+    pub fn reset_mouse_deltas(&mut self) {
+        self.controller.reset_mouse_deltas()
     }
 }

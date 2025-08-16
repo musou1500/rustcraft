@@ -1,14 +1,13 @@
 use crate::biome::Biome;
+use crate::biome::BiomeManager;
 use crate::blocks::{get_block_registry, BlockType};
 use crate::structures::{PlacedStructure, StructureGenerator};
 use crate::terrain::Terrain;
-use crate::biome::BiomeManager;
 use crate::voxel::{create_cube_indices_selective, create_cube_vertices_selective, Vertex};
-use rayon::prelude::*;
 
 pub const CHUNK_SIZE: usize = 16;
-pub const WORLD_HEIGHT: usize = 64; // Maximum world height for building
-pub const TERRAIN_MAX_HEIGHT: usize = 24; // Maximum natural terrain height
+pub const WORLD_HEIGHT: usize = 255; // Maximum world height for building
+pub const TERRAIN_MAX_HEIGHT: usize = 64; // Maximum natural terrain height
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkPos {
@@ -119,7 +118,8 @@ impl ChunkGenerator {
         }
 
         // Generate terrain blocks using pre-computed biome data
-        chunk_blocks = terrain.generate_terrain_blocks(chunk_pos, &height_values, &biome_map, biome_manager);
+        chunk_blocks =
+            terrain.generate_terrain_blocks(chunk_pos, &height_values, &biome_map, biome_manager);
 
         // Place structure blocks into the chunk
         for structure in structures {

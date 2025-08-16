@@ -346,6 +346,7 @@ impl<'window> State<'window> {
             // If in menu mode and window is focused, resume game
             if !self.game_mode && self.window_focused {
                 self.game_mode = true;
+                self.camera.reset_mouse_deltas(); // Clear accumulated mouse movement
                 self.update_cursor_state();
                 println!("🎮 Game resumed!");
                 return true;
@@ -372,7 +373,13 @@ impl<'window> State<'window> {
 
     fn update_cursor_state(&mut self) {
         if self.game_mode && self.window_focused {
-            // Game mode: confine cursor to window and hide it
+            // Game mode: center cursor, confine to window and hide it
+            let window_size = self.window.inner_size();
+            let center_x = window_size.width as f64 / 2.0;
+            let center_y = window_size.height as f64 / 2.0;
+            let _ = self
+                .window
+                .set_cursor_position(winit::dpi::PhysicalPosition::new(center_x, center_y));
             let _ = self
                 .window
                 .set_cursor_grab(winit::window::CursorGrabMode::Confined);

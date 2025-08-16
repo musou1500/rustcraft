@@ -26,9 +26,9 @@ tree_density = 0.0001
 house_chance = 0.002
 
 [Mountain]
-base_height = 8
+base_height = 5
 frequency = 0.02
-amplitude = 6.0
+amplitude = 24.0
 surface_block = "Stone"
 subsurface_block = "Stone"
 stone_block = "Stone"
