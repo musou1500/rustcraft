@@ -2,7 +2,7 @@
 # Edit these values and press F5 in-game to reload and see changes instantly!
 
 [Plains]
-base_height = 5
+base_height = 32
 frequency = 0.018
 amplitude = 2.5
 surface_block = "Grass"
@@ -14,7 +14,7 @@ tree_density = 0.015
 house_chance = 0.008
 
 [Desert]
-base_height = 5
+base_height = 32
 frequency = 0.015
 amplitude = 1.5
 surface_block = "Sand"
@@ -26,7 +26,7 @@ tree_density = 0.0001
 house_chance = 0.002
 
 [Mountain]
-base_height = 5
+base_height = 32
 frequency = 0.02
 amplitude = 24.0
 surface_block = "Stone"
@@ -38,7 +38,7 @@ tree_density = 0.005
 house_chance = 0.001
 
 [Tundra]
-base_height = 5
+base_height = 32
 frequency = 0.012
 amplitude = 1.0
 surface_block = "Snow"
@@ -50,7 +50,7 @@ tree_density = 0.002
 house_chance = 0.0005
 
 [Forest]
-base_height = 5
+base_height = 32
 frequency = 0.022
 amplitude = 3.0
 surface_block = "Grass"

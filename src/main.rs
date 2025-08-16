@@ -108,7 +108,7 @@ impl<'window> State<'window> {
 
         let camera = CameraSystem::new(
             camera::Camera::new(
-                cgmath::point3(0.0, 20.0, 0.0), // Higher spawn position
+                cgmath::point3(0.0, 64.0, 0.0), // Higher spawn position
                 cgmath::Deg(-90.0),
                 cgmath::Deg(0.0),
                 config.width as f32 / config.height as f32,

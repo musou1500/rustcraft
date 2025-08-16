@@ -7,7 +7,7 @@ use crate::voxel::{create_cube_indices_selective, create_cube_vertices_selective
 
 pub const CHUNK_SIZE: usize = 16;
 pub const WORLD_HEIGHT: usize = 255; // Maximum world height for building
-pub const TERRAIN_MAX_HEIGHT: usize = 64; // Maximum natural terrain height
+pub const TERRAIN_MAX_HEIGHT: usize = 128; // Maximum natural terrain height
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkPos {
